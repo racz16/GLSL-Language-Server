@@ -6,11 +6,11 @@ import {
 	TextDocumentChangeEvent,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-
 import { exec, ChildProcess } from 'child_process';
 import { Stream } from 'stream';
+import { platform } from 'os';
+import * as path from 'path';
 
-import path = require('path');
 import { connection } from '../server';
 
 export function diagnosticHandle(
@@ -24,7 +24,7 @@ function validateTextDocument(textDocument: TextDocument): void {
 	const validatorPath = path.join(
 		path.dirname(__dirname),
 		'res',
-		'glslangValidatorWindows'
+		`glslangValidator${getPlatformName()}`
 	);
 	const result = exec(`${validatorPath} --stdin -C -S frag`);
 	if (result.stdout) {
@@ -97,5 +97,18 @@ function provideInput(result: ChildProcess, document: TextDocument): void {
 	stdinStream.push(null);
 	if (result.stdin) {
 		stdinStream.pipe(result.stdin);
+	}
+}
+
+function getPlatformName(): string {
+	switch (platform()) {
+		case 'win32':
+			return 'Windows';
+		case 'linux':
+			return 'Linux';
+		case 'darwin':
+			return 'Mac';
+		default:
+			return '';
 	}
 }
