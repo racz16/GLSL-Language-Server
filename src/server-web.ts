@@ -21,9 +21,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			completionProvider: getCompletionOptions(
-				params.capabilities.textDocument?.completion
-			),
+			completionProvider: getCompletionOptions(params.capabilities.textDocument?.completion),
 		},
 	};
 });

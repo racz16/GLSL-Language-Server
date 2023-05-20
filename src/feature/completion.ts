@@ -16,10 +16,7 @@ export function getCompletionOptions(
 	if (!capabilities) {
 		return undefined;
 	} else {
-		documentationMarkdown =
-			!!capabilities.completionItem?.documentationFormat?.some(
-				(df) => df === 'markdown'
-			);
+		documentationMarkdown = !!capabilities.completionItem?.documentationFormat?.some((df) => df === 'markdown');
 		completionItemKinds = capabilities.completionItemKind?.valueSet ?? [];
 		return {
 			resolveProvider: false,
@@ -32,16 +29,12 @@ export function completionHandler(): CompletionItem[] {
 	return [
 		{
 			label: 'TypeScript',
-			kind: completionItemKinds.some(
-				(cik) => cik === CompletionItemKind.Text
-			)
+			kind: completionItemKinds.some((cik) => cik === CompletionItemKind.Text)
 				? CompletionItemKind.Text
 				: undefined,
 			commitCharacters: [DOT, LRB],
 			detail: 'detail',
-			documentation: documentationMarkdown
-				? { kind: 'markdown', value: '# documentation' }
-				: 'documentation',
+			documentation: documentationMarkdown ? { kind: 'markdown', value: '# documentation' } : 'documentation',
 			labelDetails: {
 				description: 'labelDetails',
 				detail: 'labelDetails.detail',
