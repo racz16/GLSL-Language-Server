@@ -17,6 +17,15 @@ export function diagnosticHandler(event: TextDocumentChangeEvent<TextDocument>):
 	}
 }
 
+export function diagnosticCloseHandler(event: TextDocumentChangeEvent<TextDocument>): void {
+	const document = event.document;
+	connection.sendDiagnostics({
+		uri: document.uri,
+		version: document.version,
+		diagnostics: [],
+	});
+}
+
 function isDocumentValidatable(platformName: string | undefined, extension: string | undefined): boolean {
 	return !!(platformName && extension && VALIDATABLE_EXTENSIONS.includes(extension));
 }

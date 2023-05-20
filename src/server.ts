@@ -9,7 +9,7 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
 import { completionHandler, getCompletionOptions } from './feature/completion';
-import { diagnosticHandler } from './feature/diagnostic';
+import { diagnosticCloseHandler, diagnosticHandler } from './feature/diagnostic';
 
 export const connection = createConnection(ProposedFeatures.all);
 
@@ -25,6 +25,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 });
 
 documents.onDidChangeContent(diagnosticHandler);
+documents.onDidClose(diagnosticCloseHandler);
 connection.onCompletion(completionHandler);
 
 documents.listen(connection);
