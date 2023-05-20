@@ -5,10 +5,12 @@ import {
 	CompletionOptions,
 } from 'vscode-languageserver';
 
+import { DOT, LRB } from '../core/constants';
+
 let documentationMarkdown = false;
 let completionItemKinds: CompletionItemKind[];
 
-export function computeCompletionOptions(
+export function getCompletionOptions(
 	capabilities: CompletionClientCapabilities | undefined
 ): CompletionOptions | undefined {
 	if (!capabilities) {
@@ -21,7 +23,7 @@ export function computeCompletionOptions(
 		completionItemKinds = capabilities.completionItemKind?.valueSet ?? [];
 		return {
 			resolveProvider: false,
-			allCommitCharacters: ['.', '('],
+			allCommitCharacters: [DOT, LRB],
 		};
 	}
 }
@@ -35,7 +37,7 @@ export function completionHandler(): CompletionItem[] {
 			)
 				? CompletionItemKind.Text
 				: undefined,
-			commitCharacters: ['.', '('],
+			commitCharacters: [DOT, LRB],
 			detail: 'detail',
 			documentation: documentationMarkdown
 				? { kind: 'markdown', value: '# documentation' }

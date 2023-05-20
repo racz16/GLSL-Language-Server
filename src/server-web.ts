@@ -9,10 +9,7 @@ import {
 } from 'vscode-languageserver/browser';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import {
-	completionHandler,
-	computeCompletionOptions,
-} from './feature/completion';
+import { completionHandler, getCompletionOptions } from './feature/completion';
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
@@ -24,7 +21,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			completionProvider: computeCompletionOptions(
+			completionProvider: getCompletionOptions(
 				params.capabilities.textDocument?.completion
 			),
 		},
