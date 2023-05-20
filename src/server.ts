@@ -8,8 +8,8 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { completionHandler, getCompletionOptions } from './feature/completion';
-import { diagnosticCloseHandler, diagnosticHandler } from './feature/diagnostic';
+import { CompletionProvider } from './feature/completion';
+import { DiagnosticProvider } from './feature/diagnostic';
 
 export const connection = createConnection(ProposedFeatures.all);
 
@@ -19,14 +19,14 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			completionProvider: getCompletionOptions(params.capabilities.textDocument?.completion),
+			completionProvider: CompletionProvider.getCompletionOptions(params.capabilities.textDocument?.completion),
 		},
 	};
 });
 
-documents.onDidChangeContent(diagnosticHandler);
-documents.onDidClose(diagnosticCloseHandler);
-connection.onCompletion(completionHandler);
+documents.onDidChangeContent(DiagnosticProvider.diagnosticOpenChangeHandler);
+documents.onDidClose(DiagnosticProvider.diagnosticCloseHandler);
+connection.onCompletion(CompletionProvider.completionHandler);
 
 documents.listen(connection);
 connection.listen();
