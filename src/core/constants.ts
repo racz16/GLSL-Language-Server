@@ -1,3 +1,5 @@
+export const GLSL_LANGUAGE_SERVER = 'glslLanguageServer';
+
 export const VERT = 'vert';
 export const TESC = 'tesc';
 export const TESE = 'tese';

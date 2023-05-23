@@ -7,63 +7,91 @@ import * as path from 'path';
 import { connection } from '../server';
 import { GLSLANGVALIDATOR, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
 import { RES_FOLDER, getExtension, getPlatformName } from '../core/utility';
+import { Configuration } from '../core/configuration';
+import { ConfigurationManager } from '../core/configuration-manager';
 
 export class DiagnosticProvider {
+	private configuration: Configuration;
+	private document: TextDocument;
+	private diagnostics: Diagnostic[] = [];
+
 	public static diagnosticOpenChangeHandler(event: TextDocumentChangeEvent<TextDocument>): void {
-		new DiagnosticProvider().onDocumentOpenChange(event.document);
+		new DiagnosticProvider(event.document).onDocumentOpenChange();
+	}
+
+	public static diagnosticConfigurationHandler(document: TextDocument): void {
+		new DiagnosticProvider(document).onDocumentOpenChange();
 	}
 
 	public static diagnosticCloseHandler(event: TextDocumentChangeEvent<TextDocument>): void {
-		new DiagnosticProvider().onDocumentClose(event.document);
+		new DiagnosticProvider(event.document).onDocumentClose();
 	}
 
-	private onDocumentOpenChange(document: TextDocument): void {
-		const platformName = getPlatformName();
-		const extension = getExtension(document);
-		if (this.isDocumentValidatable(platformName, extension)) {
-			this.validateDocument(document, platformName!, extension!);
-		}
+	public static isValidationRequired(oldConfiguration: Configuration, newConfiguration: Configuration): boolean {
+		return (
+			oldConfiguration.diagnostics.enable !== newConfiguration.diagnostics.enable ||
+			(newConfiguration.diagnostics.enable &&
+				oldConfiguration.diagnostics.markTheWholeLine !== newConfiguration.diagnostics.markTheWholeLine)
+		);
 	}
 
-	private onDocumentClose(document: TextDocument): void {
+	private static sendDiagnostics(document: TextDocument, diagnostics: Diagnostic[]): void {
 		connection.sendDiagnostics({
 			uri: document.uri,
 			version: document.version,
-			diagnostics: [],
+			diagnostics,
 		});
+	}
+
+	private constructor(document: TextDocument) {
+		this.configuration = ConfigurationManager.getConfiguration();
+		this.document = document;
+	}
+
+	private onDocumentOpenChange(): void {
+		if (!this.configuration.diagnostics.enable) {
+			DiagnosticProvider.sendDiagnostics(this.document, []);
+			return;
+		}
+		const platformName = getPlatformName();
+		const extension = getExtension(this.document);
+		if (this.isDocumentValidatable(platformName, extension)) {
+			this.validateDocument(platformName!, extension!);
+		}
+	}
+
+	private onDocumentClose(): void {
+		DiagnosticProvider.sendDiagnostics(this.document, []);
 	}
 
 	private isDocumentValidatable(platformName: string | undefined, extension: string | undefined): boolean {
 		return !!(platformName && extension && VALIDATABLE_EXTENSIONS.includes(extension));
 	}
 
-	private validateDocument(document: TextDocument, platformName: string, shaderStage: string): void {
+	private validateDocument(platformName: string, shaderStage: string): void {
 		const validatorPath = this.getValidatorPath(platformName);
 		const process = exec(`${validatorPath} --stdin -C -S ${shaderStage}`, (_, validatorOutput) => {
-			const diagnostics = this.getDiagnostics(validatorOutput, document);
-			connection.sendDiagnostics({
-				uri: document.uri,
-				version: document.version,
-				diagnostics,
-			});
+			if (DiagnosticProvider.isValidationRequired(this.configuration, ConfigurationManager.getConfiguration())) {
+				return;
+			}
+			this.addDiagnosticsAndSend(validatorOutput);
 		});
-		this.provideInput(process, document.getText());
+		this.provideInput(process);
 	}
 
 	private getValidatorPath(platformName: string): string {
 		return path.join(RES_FOLDER, GLSLANGVALIDATOR + platformName);
 	}
 
-	private getDiagnostics(validatorOutput: string, document: TextDocument): Diagnostic[] {
-		const diagnostics: Diagnostic[] = [];
+	private addDiagnosticsAndSend(validatorOutput: string): void {
 		const validatorOutputRows = validatorOutput.split(NEW_LINE);
 		for (const validatorOutputRow of validatorOutputRows) {
-			this.addDiagnosticForRow(validatorOutputRow.trim(), document, diagnostics);
+			this.addDiagnosticForRow(validatorOutputRow.trim());
 		}
-		return diagnostics;
+		DiagnosticProvider.sendDiagnostics(this.document, this.diagnostics);
 	}
 
-	private addDiagnosticForRow(validatorOutputRow: string, document: TextDocument, diagnostics: Diagnostic[]): void {
+	private addDiagnosticForRow(validatorOutputRow: string): void {
 		const regex = new RegExp(
 			"(?<severity>\\w+)\\s*:\\s*(?<column>\\d+)\\s*:\\s*(?<line>\\d+)\\s*:\\s*'(?<snippet>.*)'\\s*:\\s*(?<description>.+)"
 		);
@@ -73,7 +101,7 @@ export class DiagnosticProvider {
 			const line = +regexResult.groups['line'] - 1;
 			const snippet: string | undefined = regexResult.groups['snippet'];
 			const description = regexResult.groups['description'];
-			this.addDiagnostic(validatorSeverity, line, snippet, description, document, diagnostics);
+			this.addDiagnostic(validatorSeverity, line, snippet, description);
 		}
 	}
 
@@ -81,24 +109,22 @@ export class DiagnosticProvider {
 		validatorSeverity: string,
 		line: number,
 		snippet: string | undefined,
-		description: string,
-		document: TextDocument,
-		diagnostics: Diagnostic[]
+		description: string
 	): void {
 		const diagnostic = Diagnostic.create(
-			this.getRange(line, snippet, document),
+			this.getRange(line, snippet),
 			this.getMessage(description, snippet),
 			this.getSeverity(validatorSeverity),
 			undefined, // glslangValidator doesn't provide error codes
 			GLSLANGVALIDATOR
 		);
-		diagnostics.push(diagnostic);
+		this.diagnostics.push(diagnostic);
 	}
 
-	private getRange(line: number, snippet: string | undefined, document: TextDocument): Range {
+	private getRange(line: number, snippet: string | undefined): Range {
 		const rowRange = Range.create(Position.create(line, 0), Position.create(line + 1, 0));
-		const row = document.getText(rowRange);
-		if (snippet) {
+		const row = this.document.getText(rowRange);
+		if (snippet && !this.configuration.diagnostics.markTheWholeLine) {
 			const position = row.indexOf(snippet);
 			if (position !== -1) {
 				return Range.create(Position.create(line, position), Position.create(line, position + snippet.length));
@@ -132,7 +158,8 @@ export class DiagnosticProvider {
 		}
 	}
 
-	private provideInput(process: ChildProcess, sourceCode: string): void {
+	private provideInput(process: ChildProcess): void {
+		const sourceCode = this.document.getText();
 		const stdinStream = new Readable();
 		stdinStream.push(sourceCode);
 		stdinStream.push(null);
