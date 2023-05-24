@@ -1,3 +1,4 @@
+import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
 	DidChangeConfigurationNotification,
 	InitializeParams,
@@ -7,13 +8,12 @@ import {
 	TextDocuments,
 	createConnection,
 } from 'vscode-languageserver/node';
-import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { CompletionProvider } from './feature/completion';
-import { DiagnosticProvider } from './feature/diagnostic';
 import { Configuration } from './core/configuration';
 import { ConfigurationManager } from './core/configuration-manager';
 import { GLSL_LANGUAGE_SERVER } from './core/constants';
+import { CompletionProvider } from './feature/completion';
+import { DiagnosticProvider } from './feature/diagnostic';
 
 export const connection = createConnection(ProposedFeatures.all);
 

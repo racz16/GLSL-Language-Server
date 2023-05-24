@@ -1,19 +1,19 @@
+import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
-	createConnection,
 	BrowserMessageReader,
 	BrowserMessageWriter,
-	TextDocuments,
+	DidChangeConfigurationNotification,
+	InitializeParams,
 	InitializeResult,
 	TextDocumentSyncKind,
-	InitializeParams,
-	DidChangeConfigurationNotification,
+	TextDocuments,
+	createConnection,
 } from 'vscode-languageserver/browser';
-import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { CompletionProvider } from './feature/completion';
 import { Configuration } from './core/configuration';
 import { ConfigurationManager } from './core/configuration-manager';
 import { GLSL_LANGUAGE_SERVER } from './core/constants';
+import { CompletionProvider } from './feature/completion';
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);

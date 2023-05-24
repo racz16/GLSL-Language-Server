@@ -1,14 +1,14 @@
+import { ChildProcess, exec } from 'child_process';
+import * as path from 'path';
+import { Readable } from 'stream';
 import { Diagnostic, DiagnosticSeverity, Position, Range, TextDocumentChangeEvent } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { exec, ChildProcess } from 'child_process';
-import { Readable } from 'stream';
-import * as path from 'path';
 
-import { connection, documents } from '../server';
-import { GLSLANGVALIDATOR, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
-import { RES_FOLDER, getExtension, getPlatformName } from '../core/utility';
 import { Configuration } from '../core/configuration';
 import { ConfigurationManager } from '../core/configuration-manager';
+import { GLSLANGVALIDATOR, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
+import { RES_FOLDER, getExtension, getPlatformName } from '../core/utility';
+import { connection, documents } from '../server';
 
 export class DiagnosticProvider {
 	private configuration: Configuration;

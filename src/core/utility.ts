@@ -1,6 +1,6 @@
-import { TextDocument } from 'vscode-languageserver-textdocument';
 import { platform } from 'os';
 import * as path from 'path';
+import { TextDocument } from 'vscode-languageserver-textdocument';
 
 import { DOT } from './constants';
 
