@@ -29,7 +29,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 	};
 });
 
-connection.onInitialized( () => {
+connection.onInitialized(async () => {
 	if (ConfigurationManager.isConfigurationSupported()) {
 		connection.client.register(DidChangeConfigurationNotification.type, undefined);
 		await refreshConfiguration();
