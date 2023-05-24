@@ -17,7 +17,7 @@ import { GLSL_LANGUAGE_SERVER } from './core/constants';
 
 export const connection = createConnection(ProposedFeatures.all);
 
-const documents = new TextDocuments(TextDocument);
+export const documents = new TextDocuments(TextDocument);
 
 connection.onInitialize((params: InitializeParams): InitializeResult => {
 	ConfigurationManager.initialize(!!params.capabilities.workspace?.configuration);
@@ -45,8 +45,8 @@ async function refreshConfiguration(): Promise<void> {
 	const newConfiguration: Configuration = await connection.workspace.getConfiguration(GLSL_LANGUAGE_SERVER);
 	ConfigurationManager.setConfiguration(newConfiguration);
 	if (DiagnosticProvider.isValidationRequired(oldConfiguration, newConfiguration)) {
-		documents.all().forEach((document) => {
-			DiagnosticProvider.diagnosticConfigurationHandler(document);
+		documents.all().forEach(async (document) => {
+			await DiagnosticProvider.diagnosticConfigurationHandler(document);
 		});
 	}
 }

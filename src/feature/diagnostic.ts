@@ -4,7 +4,7 @@ import { exec, ChildProcess } from 'child_process';
 import { Readable } from 'stream';
 import * as path from 'path';
 
-import { connection } from '../server';
+import { connection, documents } from '../server';
 import { GLSLANGVALIDATOR, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
 import { RES_FOLDER, getExtension, getPlatformName } from '../core/utility';
 import { Configuration } from '../core/configuration';
@@ -15,12 +15,12 @@ export class DiagnosticProvider {
 	private document: TextDocument;
 	private diagnostics: Diagnostic[] = [];
 
-	public static diagnosticOpenChangeHandler(event: TextDocumentChangeEvent<TextDocument>): void {
-		new DiagnosticProvider(event.document).onDocumentOpenChange();
+	public static async diagnosticOpenChangeHandler(event: TextDocumentChangeEvent<TextDocument>): Promise<void> {
+		await new DiagnosticProvider(event.document).onDocumentOpenChange();
 	}
 
-	public static diagnosticConfigurationHandler(document: TextDocument): void {
-		new DiagnosticProvider(document).onDocumentOpenChange();
+	public static async diagnosticConfigurationHandler(document: TextDocument): Promise<void> {
+		await new DiagnosticProvider(document).onDocumentOpenChange();
 	}
 
 	public static diagnosticCloseHandler(event: TextDocumentChangeEvent<TextDocument>): void {
@@ -48,7 +48,7 @@ export class DiagnosticProvider {
 		this.document = document;
 	}
 
-	private onDocumentOpenChange(): void {
+	private async onDocumentOpenChange(): Promise<void> {
 		if (!this.configuration.diagnostics.enable) {
 			DiagnosticProvider.sendDiagnostics(this.document, []);
 			return;
@@ -56,7 +56,7 @@ export class DiagnosticProvider {
 		const platformName = getPlatformName();
 		const extension = getExtension(this.document);
 		if (this.isDocumentValidatable(platformName, extension)) {
-			this.validateDocument(platformName!, extension!);
+			await this.validateDocument(platformName!, extension!);
 		}
 	}
 
@@ -68,15 +68,33 @@ export class DiagnosticProvider {
 		return !!(platformName && extension && VALIDATABLE_EXTENSIONS.includes(extension));
 	}
 
-	private validateDocument(platformName: string, shaderStage: string): void {
-		const validatorPath = this.getValidatorPath(platformName);
-		const process = exec(`${validatorPath} --stdin -C -S ${shaderStage}`, (_, validatorOutput) => {
-			if (DiagnosticProvider.isValidationRequired(this.configuration, ConfigurationManager.getConfiguration())) {
-				return;
-			}
-			this.addDiagnosticsAndSend(validatorOutput);
+	private async getValidatorOutput(platformName: string, shaderStage: string): Promise<string> {
+		return new Promise<string>((resolve) => {
+			const validatorPath = this.getValidatorPath(platformName);
+			const process = exec(`${validatorPath} --stdin -C -S ${shaderStage}`, (_, validatorOutput) => {
+				resolve(validatorOutput);
+			});
+			this.provideInput(process);
 		});
-		this.provideInput(process);
+	}
+
+	private async dalayValidation(): Promise<void> {
+		const diagnosticDelay = ConfigurationManager.getConfiguration().diagnostics.delay;
+		return new Promise((resolve) => setTimeout(resolve, diagnosticDelay));
+	}
+
+	private async validateDocument(platformName: string, shaderStage: string): Promise<void> {
+		await this.dalayValidation();
+		const oldVersion = this.document.version;
+		const newVersion = documents.get(this.document.uri)?.version;
+		if (oldVersion !== newVersion) {
+			return;
+		}
+		const validatorOutput = await this.getValidatorOutput(platformName, shaderStage);
+		if (DiagnosticProvider.isValidationRequired(this.configuration, ConfigurationManager.getConfiguration())) {
+			return;
+		}
+		this.addDiagnosticsAndSend(validatorOutput);
 	}
 
 	private getValidatorPath(platformName: string): string {

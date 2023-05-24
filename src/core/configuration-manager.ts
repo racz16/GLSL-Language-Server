@@ -6,6 +6,7 @@ export class ConfigurationManager {
 		diagnostics: {
 			enable: true,
 			markTheWholeLine: false,
+			delay: 300,
 		},
 	};
 
