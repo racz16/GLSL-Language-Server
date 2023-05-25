@@ -46,12 +46,12 @@ const serverWebConfig = {
 };
 
 /**@type {import('webpack').Configuration}*/
-const serverConfig = {
+const serverDesktopConfig = {
 	context: path.join(__dirname),
 	target: 'node',
-	entry: './src/server.ts',
+	entry: './src/server-desktop.ts',
 	output: {
-		filename: 'server.js',
+		filename: 'server-desktop.js',
 		path: path.resolve(__dirname, 'out'),
 		libraryTarget: 'commonjs2',
 		devtoolModuleFilenameTemplate: '../[resource-path]',
@@ -78,4 +78,4 @@ const serverConfig = {
 	devtool: 'source-map',
 };
 
-module.exports = [serverConfig, serverWebConfig];
+module.exports = [serverDesktopConfig, serverWebConfig];

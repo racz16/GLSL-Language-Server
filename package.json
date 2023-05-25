@@ -20,20 +20,18 @@
 	"license": "MIT",
 	"keywords": [
 		"glsl",
-		"language",
-		"server",
+		"shader",
 		"language",
 		"server",
 		"protocol",
-		"node",
-		"shader"
+		"node"
 	],
 	"os": [
 		"win32",
 		"linux",
 		"darwin"
 	],
-	"main": "./out/server",
+	"main": "./out/server-desktop",
 	"browser": "./out/server-web",
 	"engines": {
 		"node": "*"
