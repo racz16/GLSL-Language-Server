@@ -1,53 +1,30 @@
 import {
-	createConnection,
 	BrowserMessageReader,
 	BrowserMessageWriter,
-	TextDocuments,
-	InitializeResult,
-	TextDocumentSyncKind,
-	InitializeParams,
-	DidChangeConfigurationNotification,
+	Connection,
+	createConnection,
 } from 'vscode-languageserver/browser';
-import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { CompletionProvider } from './feature/completion';
 import { Configuration } from './core/configuration';
 import { ConfigurationManager } from './core/configuration-manager';
 import { GLSL_LANGUAGE_SERVER } from './core/constants';
+import { Server } from './server';
 
-const messageReader = new BrowserMessageReader(self);
-const messageWriter = new BrowserMessageWriter(self);
-const connection = createConnection(messageReader, messageWriter);
-
-const documents = new TextDocuments(TextDocument);
-
-connection.onInitialize((params: InitializeParams): InitializeResult => {
-	ConfigurationManager.initialize(!!params.capabilities.workspace?.configuration);
-	return {
-		capabilities: {
-			textDocumentSync: TextDocumentSyncKind.Incremental,
-			completionProvider: CompletionProvider.getCompletionOptions(params.capabilities.textDocument?.completion),
-		},
-	};
-});
-
-connection.onInitialized(async () => {
-	if (ConfigurationManager.isConfigurationSupported()) {
-		connection.client.register(DidChangeConfigurationNotification.type, undefined);
-		await refreshConfiguration();
+export class ServerWeb extends Server {
+	public static start(): void {
+		Server.setServer(new ServerWeb());
 	}
-});
 
-connection.onDidChangeConfiguration(async () => {
-	await refreshConfiguration();
-});
+	protected createConnection(): Connection {
+		const messageReader = new BrowserMessageReader(self);
+		const messageWriter = new BrowserMessageWriter(self);
+		return createConnection(messageReader, messageWriter);
+	}
 
-async function refreshConfiguration(): Promise<void> {
-	const configuration: Configuration = await connection.workspace.getConfiguration(GLSL_LANGUAGE_SERVER);
-	ConfigurationManager.setConfiguration(configuration);
+	protected async refreshConfiguration(): Promise<void> {
+		const configuration: Configuration = await this.connection.workspace.getConfiguration(GLSL_LANGUAGE_SERVER);
+		ConfigurationManager.setConfiguration(configuration);
+	}
 }
 
-connection.onCompletion(CompletionProvider.completionHandler);
-
-documents.listen(connection);
-connection.listen();
+ServerWeb.start();

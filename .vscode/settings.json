@@ -1,5 +1,16 @@
 {
+	"[typescript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[markdown]": {
+		"editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+	},
 	"search.exclude": {
 		"out": true
-	}
+	},
+	"typescript.preferences.quoteStyle": "single",
+	"prettier.singleQuote": true
 }
