@@ -1,7 +1,7 @@
 export interface Configuration {
-	diagnostics: {
-		enable: boolean;
-		markTheWholeLine: boolean;
-		delay: number;
-	};
+    diagnostics: {
+        enable: boolean;
+        markTheWholeLine: boolean;
+        delay: number;
+    };
 }

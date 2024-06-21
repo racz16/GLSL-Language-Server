@@ -1,16 +1,16 @@
 {
-	"compilerOptions": {
-		"target": "es2020",
-		"lib": ["es2020", "WebWorker"],
-		"module": "commonjs",
-		"moduleResolution": "node",
-		"sourceMap": true,
-		"strict": true,
-		"outDir": "out",
-		"rootDir": "src",
-		"noImplicitReturns": true,
-		"noFallthroughCasesInSwitch": true
-	},
-	"include": ["src"],
-	"exclude": ["node_modules"]
+    "compilerOptions": {
+        "target": "es2020",
+        "lib": ["es2020", "WebWorker"],
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "strict": true,
+        "outDir": "out",
+        "rootDir": "src",
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": ["src"],
+    "exclude": ["node_modules"]
 }

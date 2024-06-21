@@ -5,3 +5,4 @@ res
 
 # file
 package-lock.json
+**/*.md

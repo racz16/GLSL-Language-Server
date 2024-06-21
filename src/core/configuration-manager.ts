@@ -1,28 +1,26 @@
 import { Configuration } from './configuration';
 
-export class ConfigurationManager {
-	private static configurationSupported = false;
-	private static configuration: Configuration = {
-		diagnostics: {
-			enable: true,
-			markTheWholeLine: false,
-			delay: 300,
-		},
-	};
+let configurationSupported = false;
+let configuration: Configuration = {
+    diagnostics: {
+        enable: true,
+        markTheWholeLine: false,
+        delay: 300,
+    },
+};
 
-	public static initialize(configurationSupported: boolean): void {
-		this.configurationSupported = configurationSupported;
-	}
+export function initializeConfiguration(configSupported: boolean): void {
+    configurationSupported = configSupported;
+}
 
-	public static isConfigurationSupported(): boolean {
-		return this.configurationSupported;
-	}
+export function isConfigurationSupported(): boolean {
+    return configurationSupported;
+}
 
-	public static getConfiguration(): Configuration {
-		return this.configuration;
-	}
+export function getConfiguration(): Configuration {
+    return configuration;
+}
 
-	public static setConfiguration(configuration: Configuration): void {
-		this.configuration = configuration;
-	}
+export function setConfiguration(config: Configuration): void {
+    configuration = config;
 }
