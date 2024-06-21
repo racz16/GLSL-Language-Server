@@ -44,7 +44,7 @@
         "prettier-lint": "prettier --check .",
         "prettier-format": "prettier --write .",
         "markdownlint": "markdownlint --ignore node_modules **/*.md",
-        "lint": "eslint ./src --ext .ts",
+        "eslint": "eslint ./src",
         "prepare": "husky install"
     },
     "dependencies": {

@@ -15,5 +15,5 @@ jobs:
             - uses: actions/setup-node@v3
             - run: npm install
             - run: npm run build
-            - run: npm run lint
+            - run: npm run eslint
             - run: npm run test
