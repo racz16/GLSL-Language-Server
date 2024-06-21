@@ -1,0 +1,13 @@
+name: Request a feature
+description: Request a completely new feature or the enhancement of an already existing feature.
+title: '[Feature]: '
+labels: ['enhancement']
+assignees:
+    - racz16
+body:
+    - type: textarea
+      id: feature-details
+      attributes:
+          label: Feature details
+      validations:
+          required: true
