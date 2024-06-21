@@ -1,8 +1,8 @@
 {
-	"endOfLine": "crlf",
-	"useTabs": true,
-	"tabWidth": 4,
-	"singleQuote": true,
-	"trailingComma": "es5",
-	"printWidth": 120
+    "endOfLine": "lf",
+    "useTabs": false,
+    "tabWidth": 4,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "printWidth": 120
 }
