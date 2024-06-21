@@ -1,8 +1,9 @@
 {
-	"recommendations": [
-		"dbaeumer.vscode-eslint",
-		"esbenp.prettier-vscode",
-		"github.vscode-github-actions",
-		"davidanson.vscode-markdownlint"
-	]
+    "recommendations": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "davidanson.vscode-markdownlint",
+        "editorconfig.editorconfig"
+    ]
 }
