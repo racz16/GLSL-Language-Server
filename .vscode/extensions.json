@@ -4,6 +4,7 @@
         "esbenp.prettier-vscode",
         "github.vscode-github-actions",
         "davidanson.vscode-markdownlint",
-        "editorconfig.editorconfig"
+        "editorconfig.editorconfig",
+        "codacy-app.codacy"
     ]
 }
