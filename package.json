@@ -41,6 +41,8 @@
 		"build": "webpack",
 		"watch": "webpack --watch",
 		"test": "mocha ./src/**/*.spec.ts --require ts-node/register",
+		"prettier-lint": "prettier --check .",
+		"prettier-format": "prettier --write .",
 		"lint": "eslint ./src --ext .ts",
 		"prepare": "husky install"
 	},
