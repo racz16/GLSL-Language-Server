@@ -1,0 +1,29 @@
+name: Report a bug
+description: Report a bug, for example, the language server crashes, or one of the features doesn't work correctly, etc.
+title: '[Bug]: '
+labels: ['bug']
+assignees:
+    - racz16
+body:
+    - type: markdown
+      attributes:
+          value: While most of the fields are not required, please give me as much information as possible to be able to reproduce the problem.
+    - type: input
+      id: ide
+      attributes:
+          label: The IDE
+          description: The name and the version of the IDE you used.
+          placeholder: eg. VS Code 1.84.1
+    - type: input
+      id: operating-system
+      attributes:
+          label: Operating system
+          description: Please provide the CPU architecture as well, like x64, or ARM64, etc.
+          placeholder: eg. Windows 11 x64
+    - type: textarea
+      id: description
+      attributes:
+          label: Description
+          description: Please provide information, like what have you done when the problem happened, what exactly happened, error messages, logs, pictures, etc.
+      validations:
+          required: true
