@@ -37,7 +37,7 @@
         "node": "*"
     },
     "scripts": {
-        "vscode:prepublish": "webpack --mode production",
+        "build-production": "webpack --mode production",
         "build": "webpack",
         "watch": "webpack --watch",
         "test": "mocha ./src/**/*.spec.ts --require ts-node/register",
