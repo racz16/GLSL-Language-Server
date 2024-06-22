@@ -21,10 +21,9 @@
     "keywords": [
         "glsl",
         "shader",
-        "language",
-        "server",
-        "protocol",
-        "node"
+        "webgl",
+        "opengl",
+        "vulkan"
     ],
     "os": [
         "win32",
@@ -43,32 +42,30 @@
         "test": "mocha ./src/**/*.spec.ts --require ts-node/register",
         "prettier-lint": "prettier --check .",
         "prettier-format": "prettier --write .",
-        "markdownlint": "markdownlint --ignore node_modules **/*.md",
         "eslint": "eslint ./src",
         "prepare": "husky install"
     },
     "dependencies": {
-        "vscode-languageserver": "^8.1.0",
-        "vscode-languageserver-textdocument": "^1.0.8"
+        "vscode-languageserver": "^9.0.1",
+        "vscode-languageserver-textdocument": "^1.0.11"
     },
     "devDependencies": {
         "@eslint/js": "^9.5.0",
         "@types/eslint__js": "^8.42.3",
-        "@types/mocha": "^10.0.1",
+        "@types/mocha": "^10.0.7",
         "@types/node": "^20.1.6",
         "eslint": "^8.57.0",
         "husky": "^9.0.11",
         "lint-staged": "^15.2.7",
-        "markdownlint-cli": "^0.41.0",
-        "mocha": "^10.2.0",
+        "mocha": "^10.4.0",
         "prettier": "^3.3.2",
         "prettier-plugin-organize-imports": "^3.2.4",
-        "ts-loader": "^9.4.2",
-        "ts-node": "^10.9.1",
+        "ts-loader": "^9.5.1",
+        "ts-node": "^10.9.2",
         "typescript": "^5.5.2",
         "typescript-eslint": "^7.13.1",
-        "webpack": "^5.82.1",
-        "webpack-cli": "^5.1.1"
+        "webpack": "^5.92.1",
+        "webpack-cli": "^5.1.4"
     },
     "lint-staged": {
         "*.{ts,json,yml}": "prettier --write --ignore-unknown"

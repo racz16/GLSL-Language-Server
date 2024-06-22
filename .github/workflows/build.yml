@@ -15,8 +15,6 @@ jobs:
               run: npm ci
             - name: ESLint
               run: npm run eslint
-            - name: Markdownlint
-              run: npm run markdownlint
             - name: Prettier lint
               run: npm run prettier-lint
             - name: Build in production mode
