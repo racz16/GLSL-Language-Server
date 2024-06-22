@@ -21,10 +21,9 @@
     "keywords": [
         "glsl",
         "shader",
-        "language",
-        "server",
-        "protocol",
-        "node"
+        "webgl",
+        "opengl",
+        "vulkan"
     ],
     "os": [
         "win32",
