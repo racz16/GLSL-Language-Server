@@ -13,7 +13,7 @@
                 "999999",
                 "--colors",
                 "--recursive",
-                "${workspaceFolder}/src/test/**/*.ts"
+                "${workspaceFolder}/src/**/*.spec.ts"
             ],
             "internalConsoleOptions": "openOnSessionStart"
         }

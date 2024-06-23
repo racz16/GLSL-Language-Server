@@ -1,5 +1,4 @@
 import { ChildProcess, exec } from 'child_process';
-import * as path from 'path';
 import { Readable } from 'stream';
 import { Diagnostic, DiagnosticSeverity, Position, Range, TextDocumentChangeEvent } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -7,7 +6,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { Configuration } from '../core/configuration';
 import { getConfiguration } from '../core/configuration-manager';
 import { GLSLANGVALIDATOR, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
-import { RES_FOLDER, getExtension, getPlatformName } from '../core/utility';
+import { getExtension, getPlatformName } from '../core/utility';
 import { Server } from '../server';
 
 export class DiagnosticProvider {
@@ -70,8 +69,8 @@ export class DiagnosticProvider {
 
     private async getValidatorOutput(platformName: string, shaderStage: string): Promise<string> {
         return new Promise<string>((resolve) => {
-            const validatorPath = this.getValidatorPath(platformName);
-            const process = exec(`${validatorPath} --stdin -C -S ${shaderStage}`, (_, validatorOutput) => {
+            const validatorName = this.getValidatorName(platformName);
+            const process = exec(`${validatorName} --stdin -C -S ${shaderStage}`, (_, validatorOutput) => {
                 resolve(validatorOutput);
             });
             this.provideInput(process);
@@ -97,8 +96,8 @@ export class DiagnosticProvider {
         this.addDiagnosticsAndSend(validatorOutput);
     }
 
-    private getValidatorPath(platformName: string): string {
-        return path.join(RES_FOLDER, GLSLANGVALIDATOR + platformName);
+    private getValidatorName(platformName: string): string {
+        return GLSLANGVALIDATOR + platformName;
     }
 
     private addDiagnosticsAndSend(validatorOutput: string): void {
