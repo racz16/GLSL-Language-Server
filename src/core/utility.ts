@@ -1,10 +1,7 @@
 import { platform } from 'os';
-import * as path from 'path';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
 import { DOT } from './constants';
-
-export const RES_FOLDER = path.join(path.dirname(__dirname), 'res');
 
 export function getPlatformName(): string | undefined {
     switch (platform()) {
