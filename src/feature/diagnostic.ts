@@ -136,7 +136,7 @@ export class DiagnosticProvider {
         const rowRange = Range.create(Position.create(line, 0), Position.create(line + 1, 0));
         const row = this.document.getText(rowRange);
         if (snippet && !this.configuration.diagnostics.markTheWholeLine) {
-            const position = row.indexOf(snippet);
+            const position = row.search(new RegExp(`\\b${snippet}\\b`));
             if (position !== -1) {
                 return Range.create(Position.create(line, position), Position.create(line, position + snippet.length));
             }
