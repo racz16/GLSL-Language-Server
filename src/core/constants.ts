@@ -9,7 +9,7 @@ export const COMP = 'comp';
 
 export const VALIDATABLE_EXTENSIONS = [VERT, TESC, TESE, GEOM, FRAG, COMP];
 
-export const GLSLANGVALIDATOR = 'glslangValidator';
+export const GLSLANG = 'glslang';
 
 export const NEW_LINE = '\n';
 export const DOT = '.';

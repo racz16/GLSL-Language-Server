@@ -5,7 +5,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 
 import { Configuration } from '../core/configuration';
 import { getConfiguration } from '../core/configuration-manager';
-import { GLSLANGVALIDATOR, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
+import { GLSLANG, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
 import { getExtension, getPlatformName } from '../core/utility';
 import { Server } from '../server';
 
@@ -67,11 +67,11 @@ export class DiagnosticProvider {
         return !!(platformName && extension && VALIDATABLE_EXTENSIONS.includes(extension));
     }
 
-    private async getValidatorOutput(platformName: string, shaderStage: string): Promise<string> {
+    private async getGlslangOutput(platformName: string, shaderStage: string): Promise<string> {
         return new Promise<string>((resolve) => {
-            const validatorName = this.getValidatorName(platformName);
-            const process = exec(`${validatorName} --stdin -C -S ${shaderStage}`, (_, validatorOutput) => {
-                resolve(validatorOutput);
+            const glslangName = this.getGlslangName(platformName);
+            const process = exec(`${glslangName} --stdin -C -S ${shaderStage}`, (_, glslangOutput) => {
+                resolve(glslangOutput);
             });
             this.provideInput(process);
         });
@@ -89,50 +89,45 @@ export class DiagnosticProvider {
         if (oldVersion !== newVersion) {
             return;
         }
-        const validatorOutput = await this.getValidatorOutput(platformName, shaderStage);
+        const glslangOutput = await this.getGlslangOutput(platformName, shaderStage);
         if (DiagnosticProvider.isValidationRequired(this.configuration, getConfiguration())) {
             return;
         }
-        this.addDiagnosticsAndSend(validatorOutput);
+        this.addDiagnosticsAndSend(glslangOutput);
     }
 
-    private getValidatorName(platformName: string): string {
-        return GLSLANGVALIDATOR + platformName;
+    private getGlslangName(platformName: string): string {
+        return GLSLANG + platformName;
     }
 
-    private addDiagnosticsAndSend(validatorOutput: string): void {
-        const validatorOutputRows = validatorOutput.split(NEW_LINE);
-        for (const validatorOutputRow of validatorOutputRows) {
-            this.addDiagnosticForRow(validatorOutputRow.trim());
+    private addDiagnosticsAndSend(glslangOutput: string): void {
+        const glslangOutputRows = glslangOutput.split(NEW_LINE);
+        for (const glslangOutputRow of glslangOutputRows) {
+            this.addDiagnosticForRow(glslangOutputRow.trim());
         }
         DiagnosticProvider.sendDiagnostics(this.document, this.diagnostics);
     }
 
-    private addDiagnosticForRow(validatorOutputRow: string): void {
+    private addDiagnosticForRow(glslangOutputRow: string): void {
         const regex =
             /(?<severity>\w+)\s*:\s*(\d+|\w+)\s*:\s*(?<line>\d+)\s*:\s*'(?<snippet>.*)'\s*:\s*(?<description>.+)/;
-        const regexResult = regex.exec(validatorOutputRow);
+        const regexResult = regex.exec(glslangOutputRow);
         if (regexResult?.groups) {
-            const validatorSeverity = regexResult.groups['severity'];
+            const severity = regexResult.groups['severity'];
             const line = +regexResult.groups['line'] - 1;
             const snippet: string | undefined = regexResult.groups['snippet'];
             const description = regexResult.groups['description'];
-            this.addDiagnostic(validatorSeverity, line, snippet, description);
+            this.addDiagnostic(severity, line, snippet, description);
         }
     }
 
-    private addDiagnostic(
-        validatorSeverity: string,
-        line: number,
-        snippet: string | undefined,
-        description: string
-    ): void {
+    private addDiagnostic(severity: string, line: number, snippet: string | undefined, description: string): void {
         const diagnostic = Diagnostic.create(
             this.getRange(line, snippet),
             this.getMessage(description, snippet),
-            this.getSeverity(validatorSeverity),
-            undefined, // glslangValidator doesn't provide error codes
-            GLSLANGVALIDATOR
+            this.getSeverity(severity),
+            undefined, // glslang doesn't provide error codes
+            GLSLANG
         );
         this.diagnostics.push(diagnostic);
     }
@@ -160,14 +155,14 @@ export class DiagnosticProvider {
         return snippet ? `'${snippet}' : ${description}` : description;
     }
 
-    private getSeverity(validatorSeverity: string): DiagnosticSeverity | undefined {
-        if (validatorSeverity.includes('ERROR')) {
+    private getSeverity(severity: string): DiagnosticSeverity | undefined {
+        if (severity.includes('ERROR')) {
             return DiagnosticSeverity.Error;
-        } else if (validatorSeverity.includes('WARNING')) {
+        } else if (severity.includes('WARNING')) {
             return DiagnosticSeverity.Warning;
-        } else if (validatorSeverity.includes('UNIMPLEMENTED')) {
+        } else if (severity.includes('UNIMPLEMENTED')) {
             return DiagnosticSeverity.Information;
-        } else if (validatorSeverity.includes('NOTE')) {
+        } else if (severity.includes('NOTE')) {
             return DiagnosticSeverity.Hint;
         } else {
             return undefined;
