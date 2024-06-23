@@ -109,9 +109,8 @@ export class DiagnosticProvider {
     }
 
     private addDiagnosticForRow(validatorOutputRow: string): void {
-        const regex = new RegExp(
-            "(?<severity>\\w+)\\s*:\\s*(?<column>\\d+)\\s*:\\s*(?<line>\\d+)\\s*:\\s*'(?<snippet>.*)'\\s*:\\s*(?<description>.+)"
-        );
+        const regex =
+            /(?<severity>\w+)\s*:\s*(\d+|\w+)\s*:\s*(?<line>\d+)\s*:\s*'(?<snippet>.*)'\s*:\s*(?<description>.+)/;
         const regexResult = regex.exec(validatorOutputRow);
         if (regexResult?.groups) {
             const validatorSeverity = regexResult.groups['severity'];
