@@ -3,5 +3,6 @@ export interface Configuration {
         enable: boolean;
         markTheWholeLine: boolean;
         delay: number;
+        targetEnvironment: string;
     };
 }

@@ -30,7 +30,8 @@ export class DiagnosticProvider {
         return (
             oldConfiguration.diagnostics.enable !== newConfiguration.diagnostics.enable ||
             (newConfiguration.diagnostics.enable &&
-                oldConfiguration.diagnostics.markTheWholeLine !== newConfiguration.diagnostics.markTheWholeLine)
+                (oldConfiguration.diagnostics.markTheWholeLine !== newConfiguration.diagnostics.markTheWholeLine ||
+                    oldConfiguration.diagnostics.targetEnvironment !== newConfiguration.diagnostics.targetEnvironment))
         );
     }
 
@@ -69,12 +70,20 @@ export class DiagnosticProvider {
 
     private async getGlslangOutput(platformName: string, shaderStage: string): Promise<string> {
         return new Promise<string>((resolve) => {
-            const glslangName = this.getGlslangName(platformName);
-            const process = exec(`${glslangName} --stdin -C -S ${shaderStage}`, (_, glslangOutput) => {
+            const command = this.createGlslangCommand(platformName, shaderStage);
+            const process = exec(command, (_, glslangOutput) => {
                 resolve(glslangOutput);
             });
             this.provideInput(process);
         });
+    }
+
+    private createGlslangCommand(platformName: string, shaderStage: string): string {
+        const glslangName = this.getGlslangName(platformName);
+        const targetEnvironment = this.configuration.diagnostics.targetEnvironment
+            ? `--target-env ${this.configuration.diagnostics.targetEnvironment}`
+            : '';
+        return `${glslangName} --stdin -C -S ${shaderStage} ${targetEnvironment}`;
     }
 
     private async dalayValidation(): Promise<void> {
