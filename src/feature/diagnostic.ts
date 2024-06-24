@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { Diagnostic, DiagnosticSeverity, Position, Range, TextDocumentChangeEvent } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { Configuration } from '../core/configuration';
+import { Configuration, Defines } from '../core/configuration';
 import { getConfiguration } from '../core/configuration-manager';
 import { GLSLANG, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
 import { getExtension, getPlatformName } from '../core/utility';
@@ -15,6 +15,9 @@ export class DiagnosticProvider {
     private diagnostics: Diagnostic[] = [];
 
     public static async diagnosticOpenChangeHandler(event: TextDocumentChangeEvent<TextDocument>): Promise<void> {
+        if (!getConfiguration().diagnostics.enable) {
+            return;
+        }
         await new DiagnosticProvider(event.document).onDocumentOpenChange();
     }
 
@@ -31,8 +34,30 @@ export class DiagnosticProvider {
             oldConfiguration.diagnostics.enable !== newConfiguration.diagnostics.enable ||
             (newConfiguration.diagnostics.enable &&
                 (oldConfiguration.diagnostics.markTheWholeLine !== newConfiguration.diagnostics.markTheWholeLine ||
-                    oldConfiguration.diagnostics.targetEnvironment !== newConfiguration.diagnostics.targetEnvironment))
+                    oldConfiguration.compiler.targetEnvironment !== newConfiguration.compiler.targetEnvironment ||
+                    !DiagnosticProvider.definesEqual(
+                        oldConfiguration.compiler.defines,
+                        newConfiguration.compiler.defines
+                    )))
         );
+    }
+
+    private static definesEqual(oldDefines: Defines, newDefines: Defines): boolean {
+        const oldEntries = Object.entries(oldDefines);
+        const newEntries = Object.entries(newDefines);
+        if (oldEntries.length !== newEntries.length) {
+            return false;
+        }
+        for (let i = 0; i < oldEntries.length; i++) {
+            const oldKey = oldEntries[i][0];
+            const oldValue = oldEntries[i][1];
+            const newKey = newEntries[i][0];
+            const newValue = newEntries[i][1];
+            if (oldKey !== newKey || oldValue !== newValue) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static sendDiagnostics(document: TextDocument, diagnostics: Diagnostic[]): void {
@@ -80,14 +105,19 @@ export class DiagnosticProvider {
 
     private createGlslangCommand(platformName: string, shaderStage: string): string {
         const glslangName = this.getGlslangName(platformName);
-        const targetEnvironment = this.configuration.diagnostics.targetEnvironment
-            ? `--target-env ${this.configuration.diagnostics.targetEnvironment}`
+        const targetEnvironment = this.configuration.compiler.targetEnvironment
+            ? `--target-env ${this.configuration.compiler.targetEnvironment}`
             : '';
-        return `${glslangName} --stdin -C -S ${shaderStage} ${targetEnvironment}`;
+        let defines = '';
+        const keys = Object.keys(this.configuration.compiler.defines);
+        for (const key of keys) {
+            defines += `--define-macro ${key}=${this.configuration.compiler.defines[key]} `;
+        }
+        return `${glslangName} --stdin -C -l -S ${shaderStage} ${targetEnvironment} ${defines}`;
     }
 
     private async dalayValidation(): Promise<void> {
-        const diagnosticDelay = getConfiguration().diagnostics.delay;
+        const diagnosticDelay = this.configuration.diagnostics.delay;
         return new Promise((resolve) => setTimeout(resolve, diagnosticDelay));
     }
 
@@ -99,9 +129,6 @@ export class DiagnosticProvider {
             return;
         }
         const glslangOutput = await this.getGlslangOutput(platformName, shaderStage);
-        if (DiagnosticProvider.isValidationRequired(this.configuration, getConfiguration())) {
-            return;
-        }
         this.addDiagnosticsAndSend(glslangOutput);
     }
 

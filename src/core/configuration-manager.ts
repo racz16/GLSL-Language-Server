@@ -6,7 +6,10 @@ let configuration: Configuration = {
         enable: true,
         markTheWholeLine: false,
         delay: 300,
+    },
+    compiler: {
         targetEnvironment: '',
+        defines: {},
     },
 };
 
