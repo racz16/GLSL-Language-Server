@@ -78,6 +78,7 @@ module.exports = (_env, argv) => {
         },
         externals: {
             vscode: 'commonjs vscode',
+            fsevents: "require('fsevents')",
         },
         devtool: isProductionMode ? false : 'source-map',
     };

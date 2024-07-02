@@ -1,139 +1,125 @@
 import { ChildProcess, exec } from 'child_process';
+import { access, chmod, constants } from 'fs/promises';
+import { arch, platform } from 'os';
 import { Readable } from 'stream';
-import { Diagnostic, DiagnosticSeverity, Position, Range, TextDocumentChangeEvent } from 'vscode-languageserver';
-import { TextDocument } from 'vscode-languageserver-textdocument';
+import { Diagnostic, DiagnosticSeverity, DocumentUri, Position, Range } from 'vscode-languageserver';
 
-import { Configuration, Defines } from '../core/configuration';
-import { getConfiguration } from '../core/configuration-manager';
-import { GLSLANG, NEW_LINE, VALIDATABLE_EXTENSIONS } from '../core/constants';
-import { getExtension, getPlatformName } from '../core/utility';
-import { Server } from '../server';
+import { Configuration, getConfiguration } from '../core/configuration';
+import { GLSLANG, NEW_LINE, SPACE } from '../core/constants';
+import { DocumentInfo } from '../core/document-info';
+import { getPlatformName } from '../core/node-utility';
+import { sendDiagnostics } from '../core/utility';
 
 export class DiagnosticProvider {
+    private static ignoredErrorMessages = ['No code generated', 'Missing entry point'];
+    private static glslangName = '';
+
     private configuration: Configuration;
-    private document: TextDocument;
+    private di: DocumentInfo;
+    private sourceCodeRows: string[] = [];
+    private version: number;
     private diagnostics: Diagnostic[] = [];
 
-    public static async diagnosticOpenChangeHandler(event: TextDocumentChangeEvent<TextDocument>): Promise<void> {
-        if (!getConfiguration().diagnostics.enable) {
-            return;
+    public static async initialize(): Promise<void> {
+        const platformName = platform();
+        if (DiagnosticProvider.isExecutableAvailable(platformName)) {
+            const glslangName = GLSLANG + getPlatformName();
+            const executablePath = glslangName;
+            const executable = await DiagnosticProvider.makeFileExecutableIfNeeded(executablePath, platformName);
+            if (executable) {
+                DiagnosticProvider.glslangName = glslangName;
+            }
         }
-        await new DiagnosticProvider(event.document).onDocumentOpenChange();
     }
 
-    public static async diagnosticConfigurationHandler(document: TextDocument): Promise<void> {
-        await new DiagnosticProvider(document).onDocumentOpenChange();
+    private static isExecutableAvailable(platformName: NodeJS.Platform): boolean {
+        return (platformName === 'win32' || platformName === 'linux' || platformName === 'darwin') && arch() === 'x64';
     }
 
-    public static diagnosticCloseHandler(event: TextDocumentChangeEvent<TextDocument>): void {
-        new DiagnosticProvider(event.document).onDocumentClose();
-    }
-
-    public static isValidationRequired(oldConfiguration: Configuration, newConfiguration: Configuration): boolean {
-        return (
-            oldConfiguration.diagnostics.enable !== newConfiguration.diagnostics.enable ||
-            (newConfiguration.diagnostics.enable &&
-                (oldConfiguration.diagnostics.markTheWholeLine !== newConfiguration.diagnostics.markTheWholeLine ||
-                    oldConfiguration.compiler.targetEnvironment !== newConfiguration.compiler.targetEnvironment ||
-                    !DiagnosticProvider.definesEqual(
-                        oldConfiguration.compiler.defines,
-                        newConfiguration.compiler.defines
-                    )))
-        );
-    }
-
-    private static definesEqual(oldDefines: Defines, newDefines: Defines): boolean {
-        const oldEntries = Object.entries(oldDefines);
-        const newEntries = Object.entries(newDefines);
-        if (oldEntries.length !== newEntries.length) {
-            return false;
+    private static async makeFileExecutableIfNeeded(file: string, platformName: NodeJS.Platform): Promise<boolean> {
+        if (platformName === 'win32') {
+            return true;
         }
-        for (let i = 0; i < oldEntries.length; i++) {
-            const oldKey = oldEntries[i][0];
-            const oldValue = oldEntries[i][1];
-            const newKey = newEntries[i][0];
-            const newValue = newEntries[i][1];
-            if (oldKey !== newKey || oldValue !== newValue) {
+        try {
+            await access(file, constants.X_OK);
+            return true;
+        } catch (e1) {
+            // file is not executable
+            try {
+                await chmod(file, 0o755);
+                return true;
+            } catch (e2) {
+                // can't make the file executable
                 return false;
             }
         }
-        return true;
     }
 
-    private static sendDiagnostics(document: TextDocument, diagnostics: Diagnostic[]): void {
-        Server.getServer().getConnection().sendDiagnostics({
-            uri: document.uri,
-            version: document.version,
-            diagnostics,
-        });
-    }
-
-    private constructor(document: TextDocument) {
+    public constructor(di: DocumentInfo) {
         this.configuration = getConfiguration();
-        this.document = document;
+        this.di = di;
+        this.version = di.diagnostics.increaseVersion();
     }
 
-    private async onDocumentOpenChange(): Promise<void> {
-        if (!this.configuration.diagnostics.enable) {
-            DiagnosticProvider.sendDiagnostics(this.document, []);
-            return;
+    public async validate(): Promise<void> {
+        const shaderStage = this.getShaderStage(this.di.uri);
+        if (DiagnosticProvider.glslangName && shaderStage) {
+            const sourceCode = await this.di.document.getText();
+            this.sourceCodeRows = sourceCode.split(NEW_LINE);
+            const glslangOutput = await this.runGlslang(shaderStage, sourceCode);
+            this.addDiagnosticsAndSend(glslangOutput);
         }
-        const platformName = getPlatformName();
-        const extension = getExtension(this.document);
-        if (platformName && extension && this.isDocumentValidatable(platformName, extension)) {
-            await this.validateDocument(platformName, extension);
+    }
+
+    private getShaderStage(uri: DocumentUri): string | null {
+        if (this.configuration.fileExtensions.vertexShader.some((ext) => uri.endsWith(ext))) {
+            return 'vert';
         }
+        if (this.configuration.fileExtensions.tessellationControlShader.some((ext) => uri.endsWith(ext))) {
+            return 'tesc';
+        }
+        if (this.configuration.fileExtensions.tessellationEvaluationShader.some((ext) => uri.endsWith(ext))) {
+            return 'tese';
+        }
+        if (this.configuration.fileExtensions.geometryShader.some((ext) => uri.endsWith(ext))) {
+            return 'geom';
+        }
+        if (this.configuration.fileExtensions.fragmentShader.some((ext) => uri.endsWith(ext))) {
+            return 'frag';
+        }
+        if (this.configuration.fileExtensions.computeShader.some((ext) => uri.endsWith(ext))) {
+            return 'comp';
+        }
+        return null;
     }
 
-    private onDocumentClose(): void {
-        DiagnosticProvider.sendDiagnostics(this.document, []);
-    }
-
-    private isDocumentValidatable(platformName: string | undefined, extension: string | undefined): boolean {
-        return !!(platformName && extension && VALIDATABLE_EXTENSIONS.includes(extension));
-    }
-
-    private async getGlslangOutput(platformName: string, shaderStage: string): Promise<string> {
+    private async runGlslang(shaderStage: string, sourceCode: string): Promise<string> {
         return new Promise<string>((resolve) => {
-            const command = this.createGlslangCommand(platformName, shaderStage);
+            const command = this.createGlslangCommand(shaderStage);
             const process = exec(command, (_, glslangOutput) => {
                 resolve(glslangOutput);
             });
-            this.provideInput(process);
+            this.provideInput(process, sourceCode);
         });
     }
 
-    private createGlslangCommand(platformName: string, shaderStage: string): string {
-        const glslangName = this.getGlslangName(platformName);
+    private createGlslangCommand(shaderStage: string): string {
         const targetEnvironment = this.configuration.compiler.targetEnvironment
             ? `--target-env ${this.configuration.compiler.targetEnvironment}`
             : '';
-        let defines = '';
-        const keys = Object.keys(this.configuration.compiler.defines);
-        for (const key of keys) {
-            defines += `--define-macro ${key}=${this.configuration.compiler.defines[key]} `;
+        const version = this.configuration.compiler.glslVersion
+            ? `--glsl-version ${this.configuration.compiler.glslVersion}`
+            : '';
+        return `${DiagnosticProvider.glslangName} --stdin -C -l -S ${shaderStage} ${targetEnvironment} ${version}`;
+    }
+
+    private provideInput(process: ChildProcess, sourceCode: string): void {
+        const stdinStream = new Readable();
+        stdinStream.push(sourceCode);
+        stdinStream.push(null);
+        if (process.stdin) {
+            stdinStream.pipe(process.stdin);
         }
-        return `${glslangName} --stdin -C -l -S ${shaderStage} ${targetEnvironment} ${defines}`;
-    }
-
-    private async dalayValidation(): Promise<void> {
-        const diagnosticDelay = this.configuration.diagnostics.delay;
-        return new Promise((resolve) => setTimeout(resolve, diagnosticDelay));
-    }
-
-    private async validateDocument(platformName: string, shaderStage: string): Promise<void> {
-        await this.dalayValidation();
-        const oldVersion = this.document.version;
-        const newVersion = Server.getServer().getDocuments().get(this.document.uri)?.version;
-        if (oldVersion !== newVersion) {
-            return;
-        }
-        const glslangOutput = await this.getGlslangOutput(platformName, shaderStage);
-        this.addDiagnosticsAndSend(glslangOutput);
-    }
-
-    private getGlslangName(platformName: string): string {
-        return GLSLANG + platformName;
     }
 
     private addDiagnosticsAndSend(glslangOutput: string): void {
@@ -141,20 +127,30 @@ export class DiagnosticProvider {
         for (const glslangOutputRow of glslangOutputRows) {
             this.addDiagnosticForRow(glslangOutputRow.trim());
         }
-        DiagnosticProvider.sendDiagnostics(this.document, this.diagnostics);
+        sendDiagnostics(this.di.uri, this.diagnostics, this.version);
     }
 
     private addDiagnosticForRow(glslangOutputRow: string): void {
         const regex =
-            /(?<severity>\w+)\s*:\s*(\d+|\w+)\s*:\s*(?<line>\d+)\s*:\s*'(?<snippet>.*)'\s*:\s*(?<description>.+)/;
+            /(?<severity>\w+)\s*:\s*((\d+|\w+)\s*:\s*(?<line>\d+)\s*:\s*)?(?:'(?<snippet>.*)'\s*:\s*)?(?<description>.+)/;
         const regexResult = regex.exec(glslangOutputRow);
         if (regexResult?.groups) {
             const severity = regexResult.groups['severity'];
-            const line = +regexResult.groups['line'] - 1;
+            const line = this.getLine(regexResult.groups['line']);
             const snippet: string | undefined = regexResult.groups['snippet'];
             const description = regexResult.groups['description'];
-            this.addDiagnostic(severity, line, snippet, description);
+            if (!DiagnosticProvider.ignoredErrorMessages.some((em) => description.includes(em))) {
+                this.addDiagnostic(severity, line, snippet, description);
+            }
         }
+    }
+
+    private getLine(lineMatch?: string): number {
+        if (!lineMatch) {
+            return 0;
+        }
+        const line = +lineMatch - 1;
+        return 0 <= line && line < this.sourceCodeRows.length ? line : 0;
     }
 
     private addDiagnostic(severity: string, line: number, snippet: string | undefined, description: string): void {
@@ -169,8 +165,7 @@ export class DiagnosticProvider {
     }
 
     private getRange(line: number, snippet: string | undefined): Range {
-        const rowRange = Range.create(Position.create(line, 0), Position.create(line + 1, 0));
-        const row = this.document.getText(rowRange);
+        const row = this.replaceComments(this.sourceCodeRows[line]);
         if (snippet && !this.configuration.diagnostics.markTheWholeLine) {
             const position = row.search(new RegExp(`\\b${snippet}\\b`));
             if (position !== -1) {
@@ -178,6 +173,17 @@ export class DiagnosticProvider {
             }
         }
         return this.getTrimmedRange(line, row);
+    }
+
+    private replaceComments(line: string): string {
+        const regex = /\/\*.*?\*\/|^(?:[^/]|\/[^*])*\*\/|\/\*(?:[^*]|\*[^/])*$|\/\/.*/g;
+        let regexResult: RegExpExecArray | null;
+        while ((regexResult = regex.exec(line))) {
+            const position = regexResult.index;
+            const matchLength = regexResult[0].length;
+            line = line.substring(0, position) + SPACE.repeat(matchLength) + line.substring(position + matchLength);
+        }
+        return line;
     }
 
     private getTrimmedRange(line: number, row: string): Range {
@@ -202,16 +208,6 @@ export class DiagnosticProvider {
             return DiagnosticSeverity.Hint;
         } else {
             return undefined;
-        }
-    }
-
-    private provideInput(process: ChildProcess): void {
-        const sourceCode = this.document.getText();
-        const stdinStream = new Readable();
-        stdinStream.push(sourceCode);
-        stdinStream.push(null);
-        if (process.stdin) {
-            stdinStream.pipe(process.stdin);
         }
     }
 }

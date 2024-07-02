@@ -5,9 +5,9 @@ import {
     createConnection,
 } from 'vscode-languageserver/browser';
 
-import { Configuration } from './core/configuration';
-import { setConfiguration } from './core/configuration-manager';
-import { GLSL_LANGUAGE_SERVER } from './core/constants';
+import { Configuration, extensionsConfigurationChanged } from './core/configuration';
+import { analyzeAllDocuments } from './core/document-info';
+import { Host } from './core/host';
 import { Server } from './server';
 
 export class ServerWeb extends Server {
@@ -15,15 +15,35 @@ export class ServerWeb extends Server {
         Server.setServer(new ServerWeb());
     }
 
-    protected createConnection(): Connection {
+    protected override createConnection(): Connection {
         const messageReader = new BrowserMessageReader(self);
         const messageWriter = new BrowserMessageWriter(self);
         return createConnection(messageReader, messageWriter);
     }
 
-    protected async refreshConfiguration(): Promise<void> {
-        const configuration: Configuration = await this.connection.workspace.getConfiguration(GLSL_LANGUAGE_SERVER);
-        setConfiguration(configuration);
+    protected override createHost(): Host {
+        return {
+            isDesktop: () => {
+                return false;
+            },
+            getDocumentContent: async () => {
+                return '';
+            },
+            validate: async () => {},
+        };
+    }
+
+    protected override async refreshConfiguration(
+        oldConfiguration: Configuration,
+        newConfiguration: Configuration
+    ): Promise<void> {
+        if (
+            oldConfiguration.compiler.glslVersion !== newConfiguration.compiler.glslVersion ||
+            oldConfiguration.compiler.targetEnvironment !== newConfiguration.compiler.targetEnvironment ||
+            extensionsConfigurationChanged(oldConfiguration.fileExtensions, newConfiguration.fileExtensions)
+        ) {
+            analyzeAllDocuments();
+        }
     }
 }
 
