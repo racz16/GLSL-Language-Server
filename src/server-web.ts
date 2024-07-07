@@ -30,6 +30,7 @@ export class ServerWeb extends Server {
                 return '';
             },
             validate: async () => [],
+            sendDiagnostics: () => {},
         };
     }
 

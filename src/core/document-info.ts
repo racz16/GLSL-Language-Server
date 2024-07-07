@@ -1,6 +1,5 @@
 import { Diagnostic, DocumentUri } from 'vscode-languageserver';
 
-import { DiagnosticProvider } from '../feature/diagnostic';
 import { Server } from '../server';
 import { getConfiguration, getDiagnosticConfigurationVersion } from './configuration';
 import { fsUriToLspUri } from './utility';
@@ -154,7 +153,7 @@ export async function analyzeDocument(di: DocumentInfo): Promise<void> {
         (configuration.diagnostics.workspace || di.document.isOpened())
     ) {
         const diagnostics = await di.diagnostics.getDiagnostics();
-        DiagnosticProvider.sendDiagnostics(di, diagnostics);
+        server.getHost().sendDiagnostics(di, diagnostics);
     }
 }
 

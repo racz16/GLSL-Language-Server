@@ -51,6 +51,7 @@ export class ServerDesktop extends Server {
                 const dp = new DiagnosticProvider(di);
                 return await dp.validate();
             },
+            sendDiagnostics: DiagnosticProvider.sendDiagnostics,
         };
     }
 
