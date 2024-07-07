@@ -1,21 +1,24 @@
-import { platform } from 'os';
-import { TextDocument } from 'vscode-languageserver-textdocument';
+import { DocumentUri } from 'vscode-languageserver';
+import { URI } from 'vscode-uri';
 
-import { DOT } from './constants';
-
-export function getPlatformName(): string | undefined {
-    switch (platform()) {
-        case 'win32':
-            return 'Windows';
-        case 'linux':
-            return 'Linux';
-        case 'darwin':
-            return 'Mac';
-        default:
-            return undefined;
-    }
+export function lspUriToFsUri(uri: DocumentUri): DocumentUri {
+    return URI.parse(uri).fsPath;
 }
 
-export function getExtension(document: TextDocument): string | undefined {
-    return document.uri.split(DOT).pop();
+export function fsUriToLspUri(uri: DocumentUri): DocumentUri {
+    return URI.file(uri).toString();
+}
+
+export function arraysEqual<T>(a1: T[], a2: T[]): boolean {
+    return a1.length === a2.length && a1.every((item, i) => item === a2[i]);
+}
+
+export function onlyInFirstArray<T>(a1: T[], a2: T[]): T[] {
+    const result: T[] = [];
+    for (const item of a1) {
+        if (!a2.includes(item)) {
+            result.push(item);
+        }
+    }
+    return result;
 }
