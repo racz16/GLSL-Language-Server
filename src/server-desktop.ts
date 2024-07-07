@@ -1,12 +1,20 @@
 import { FSWatcher, watch } from 'chokidar';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { Connection, ProposedFeatures, TextDocumentChangeEvent, createConnection } from 'vscode-languageserver/node';
+import {
+    Connection,
+    InitializeParams,
+    InitializeResult,
+    ProposedFeatures,
+    TextDocumentChangeEvent,
+    createConnection,
+} from 'vscode-languageserver/node';
 
 import {
     Configuration,
     extensionsConfigurationChanged,
     getConfiguration,
     increaseDiagnosticConfigurationVersion,
+    onlyInFirstExtensions,
 } from './core/configuration';
 import {
     DocumentInfo,
@@ -15,11 +23,10 @@ import {
     forEachDocument,
     getDocumentInfo,
     removeDocumentInfo,
-    removeInvalidDocumentInfos,
 } from './core/document-info';
 import { Host } from './core/host';
 import { getDocumentContent } from './core/node-utility';
-import { lspUriToFsUri, sendDiagnostics } from './core/utility';
+import { lspUriToFsUri } from './core/utility';
 import { DiagnosticProvider } from './feature/diagnostic';
 import { Server } from './server';
 
@@ -42,14 +49,26 @@ export class ServerDesktop extends Server {
             getDocumentContent: getDocumentContent,
             validate: async (di) => {
                 const dp = new DiagnosticProvider(di);
-                await dp.validate();
+                return await dp.validate();
             },
         };
     }
 
+    protected async onInitialize(params: InitializeParams): Promise<InitializeResult> {
+        const result = await super.onInitialize(params);
+        await DiagnosticProvider.initialize();
+        if (DiagnosticProvider.isPullDiagnostics()) {
+            result.capabilities.diagnosticProvider = {
+                documentSelector: [{ language: 'glsl' }],
+                interFileDependencies: false,
+                workspaceDiagnostics: true,
+            };
+        }
+        return result;
+    }
+
     protected override async onInitialized(): Promise<void> {
         await super.onInitialized();
-        await DiagnosticProvider.initialize();
         await this.addDocumentWatchers();
     }
 
@@ -70,14 +89,16 @@ export class ServerDesktop extends Server {
         });
         documentWatcher.on('change', (uri) => {
             const di = getDocumentInfo(uri);
-            di.document.increaseVersion();
+            if (!di.document.isOpened()) {
+                di.document.increaseVersion();
+            }
             this.analyzeDocumentIfNotOpened(di);
         });
         documentWatcher.on('unlink', (uri) => {
             const di = getDocumentInfo(uri);
             const diagnostics = getConfiguration().diagnostics;
             if (diagnostics.enable && diagnostics.workspace) {
-                this.removeDiagnosticsFrom(di);
+                DiagnosticProvider.removeDiagnosticsFrom(di);
             }
             removeDocumentInfo(uri);
         });
@@ -102,8 +123,10 @@ export class ServerDesktop extends Server {
         }
     }
 
-    private removeDiagnosticsFrom(di: DocumentInfo): void {
-        sendDiagnostics(di.uri, [], di.diagnostics.increaseVersion());
+    private refreshDiagnostics(): void {
+        if (DiagnosticProvider.isPullDiagnostics()) {
+            this.connection.languages.diagnostics.refresh();
+        }
     }
 
     protected override async refreshConfiguration(
@@ -119,10 +142,17 @@ export class ServerDesktop extends Server {
             oldConfiguration.compiler.glslVersion !== newConfiguration.compiler.glslVersion ||
             oldConfiguration.compiler.targetEnvironment !== newConfiguration.compiler.targetEnvironment
         ) {
-            increaseDiagnosticConfigurationVersion();
-            analyzeAllDocuments();
+            this.generalConfigurationChanged();
         } else if (extensionsConfigurationChanged(oldConfiguration.fileExtensions, newConfiguration.fileExtensions)) {
-            await this.extensionsChanged();
+            const removedExtensions = onlyInFirstExtensions(
+                oldConfiguration.fileExtensions,
+                newConfiguration.fileExtensions
+            );
+            const addedExtensions = onlyInFirstExtensions(
+                newConfiguration.fileExtensions,
+                oldConfiguration.fileExtensions
+            );
+            await this.extensionsChanged(removedExtensions, addedExtensions);
         }
     }
 
@@ -132,9 +162,10 @@ export class ServerDesktop extends Server {
             analyzeAllDocuments();
         } else {
             forEachDocument((di) => {
-                this.removeDiagnosticsFrom(di);
+                DiagnosticProvider.removeDiagnosticsFrom(di);
             });
         }
+        this.refreshDiagnostics();
     }
 
     private diagnosticsWorkspaceChanged(workspace: boolean): void {
@@ -146,20 +177,32 @@ export class ServerDesktop extends Server {
         } else {
             forEachDocument((di) => {
                 if (!di.document.isOpened()) {
-                    this.removeDiagnosticsFrom(di);
+                    DiagnosticProvider.removeDiagnosticsFrom(di);
                 }
             });
         }
+        this.refreshDiagnostics();
     }
 
-    private async extensionsChanged(): Promise<void> {
+    private generalConfigurationChanged(): void {
+        increaseDiagnosticConfigurationVersion();
+        analyzeAllDocuments();
+        this.refreshDiagnostics();
+    }
+
+    private async extensionsChanged(removedExtensions: string[], addedExtensions: string[]): Promise<void> {
         increaseDiagnosticConfigurationVersion();
         await this.removeDocumentWatchers();
         forEachDocument((di) => {
-            this.removeDiagnosticsFrom(di);
+            if (removedExtensions.some((e) => di.uri.endsWith(e))) {
+                DiagnosticProvider.removeDiagnosticsFrom(di);
+            }
+            if (addedExtensions.some((e) => di.uri.endsWith(e))) {
+                analyzeDocument(di);
+            }
         });
-        removeInvalidDocumentInfos();
         await this.addDocumentWatchers();
+        this.refreshDiagnostics();
     }
 
     private async removeDocumentWatchers(): Promise<void> {
@@ -174,13 +217,23 @@ export class ServerDesktop extends Server {
         const diagnostics = getConfiguration().diagnostics;
         if (diagnostics.enable && !diagnostics.workspace) {
             const di = getDocumentInfo(lspUriToFsUri(event.document.uri));
-            this.removeDiagnosticsFrom(di);
+            DiagnosticProvider.removeDiagnosticsFrom(di);
         }
     }
 
     protected override async onShutdown(): Promise<void> {
         await super.onShutdown();
         await this.removeDocumentWatchers();
+    }
+
+    protected override addFeatures(): void {
+        super.addFeatures();
+        this.connection.languages.diagnostics.on(async (params) => {
+            return await DiagnosticProvider.validateDocument(params);
+        });
+        this.connection.languages.diagnostics.onWorkspace(async (params, token, workDoneProgress, resultProgress) => {
+            return await DiagnosticProvider.validateWorkspace(resultProgress, token);
+        });
     }
 }
 

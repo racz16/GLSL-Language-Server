@@ -1,4 +1,4 @@
-import { arraysEqual } from './utility';
+import { arraysEqual, onlyInFirstArray } from './utility';
 
 export interface Configuration {
     diagnostics: DiagnosticsConfiguration;
@@ -75,6 +75,19 @@ export function extensionsConfigurationChanged(
         arraysEqual(oldExtensions.tessellationEvaluationShader, newExtensions.tessellationEvaluationShader) &&
         arraysEqual(oldExtensions.geometryShader, newExtensions.geometryShader) &&
         arraysEqual(oldExtensions.fragmentShader, newExtensions.fragmentShader) &&
-        arraysEqual(oldExtensions.computeShader, newExtensions.computeShader)
+        arraysEqual(oldExtensions.computeShader, newExtensions.computeShader) &&
+        arraysEqual(oldExtensions.generalShader, newExtensions.generalShader)
     );
+}
+
+export function onlyInFirstExtensions(e1: FileExtensionsConfiguration, e2: FileExtensionsConfiguration): string[] {
+    return [
+        ...onlyInFirstArray(e1.vertexShader, e2.vertexShader),
+        ...onlyInFirstArray(e1.tessellationControlShader, e2.tessellationControlShader),
+        ...onlyInFirstArray(e1.tessellationEvaluationShader, e2.tessellationEvaluationShader),
+        ...onlyInFirstArray(e1.geometryShader, e2.geometryShader),
+        ...onlyInFirstArray(e1.fragmentShader, e2.fragmentShader),
+        ...onlyInFirstArray(e1.computeShader, e2.computeShader),
+        ...onlyInFirstArray(e1.generalShader, e2.generalShader),
+    ];
 }

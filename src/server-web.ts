@@ -29,7 +29,7 @@ export class ServerWeb extends Server {
             getDocumentContent: async () => {
                 return '';
             },
-            validate: async () => {},
+            validate: async () => [],
         };
     }
 

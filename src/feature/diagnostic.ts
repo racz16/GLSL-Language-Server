@@ -2,22 +2,46 @@ import { ChildProcess, exec } from 'child_process';
 import { access, chmod, constants } from 'fs/promises';
 import { arch, platform } from 'os';
 import { Readable } from 'stream';
-import { Diagnostic, DiagnosticSeverity, DocumentUri, Position, Range } from 'vscode-languageserver';
+import {
+    CancellationToken,
+    Diagnostic,
+    DiagnosticSeverity,
+    DocumentDiagnosticParams,
+    DocumentDiagnosticReport,
+    DocumentUri,
+    Position,
+    PublishDiagnosticsParams,
+    Range,
+    ResultProgressReporter,
+    WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportPartialResult,
+    WorkspaceDocumentDiagnosticReport,
+} from 'vscode-languageserver';
 
+import { getCapabilities } from '../core/capabilities';
 import { Configuration, getConfiguration } from '../core/configuration';
 import { GLSLANG, NEW_LINE, SPACE } from '../core/constants';
-import { DocumentInfo } from '../core/document-info';
+import {
+    createDiagnosticVersion,
+    DiagnosticVersion,
+    DocumentInfo,
+    forEachDocument,
+    getDocumentInfo,
+} from '../core/document-info';
 import { getPlatformName } from '../core/node-utility';
-import { sendDiagnostics } from '../core/utility';
+import { fsUriToLspUri, lspUriToFsUri } from '../core/utility';
+import { Server } from '../server';
+
+type DiagnosticType = 'publish' | 'pull' | null;
 
 export class DiagnosticProvider {
     private static ignoredErrorMessages = ['No code generated', 'Missing entry point'];
     private static glslangName = '';
+    private static type: DiagnosticType = null;
 
     private configuration: Configuration;
     private di: DocumentInfo;
     private sourceCodeRows: string[] = [];
-    private version: number;
     private diagnostics: Diagnostic[] = [];
 
     public static async initialize(): Promise<void> {
@@ -28,8 +52,26 @@ export class DiagnosticProvider {
             const executable = await DiagnosticProvider.makeFileExecutableIfNeeded(executablePath, platformName);
             if (executable) {
                 DiagnosticProvider.glslangName = glslangName;
+                DiagnosticProvider.setType();
             }
         }
+    }
+
+    private static setType(): void {
+        const capabilities = getCapabilities();
+        if (capabilities.publishDiagnostics) {
+            DiagnosticProvider.type = 'publish';
+        } else if (capabilities.pullDiagnostics) {
+            DiagnosticProvider.type = 'pull';
+        }
+    }
+
+    public static isPublishDiagnostics(): boolean {
+        return DiagnosticProvider.type === 'publish';
+    }
+
+    public static isPullDiagnostics(): boolean {
+        return DiagnosticProvider.type === 'pull';
     }
 
     private static isExecutableAvailable(platformName: NodeJS.Platform): boolean {
@@ -55,20 +97,121 @@ export class DiagnosticProvider {
         }
     }
 
+    public static async validateDocument(params: DocumentDiagnosticParams): Promise<DocumentDiagnosticReport> {
+        await Server.getServer().waitUntilInitialized();
+        const di = getDocumentInfo(lspUriToFsUri(params.textDocument.uri));
+        const dv = createDiagnosticVersion(di);
+        if (DiagnosticProvider.diagnosticsValid(di, dv) && params.previousResultId) {
+            return {
+                kind: 'unchanged',
+                resultId: params.previousResultId,
+            };
+        } else if (!getConfiguration().diagnostics.enable) {
+            return {
+                kind: 'full',
+                resultId: di.diagnostics.increaseVersion().toString(),
+                items: [],
+            };
+        }
+        return {
+            resultId: di.diagnostics.increaseVersion().toString(),
+            kind: 'full',
+            items: await di.diagnostics.getDiagnostics(),
+        };
+    }
+
+    public static async validateWorkspace(
+        resultProgress: ResultProgressReporter<WorkspaceDiagnosticReportPartialResult> | undefined,
+        token: CancellationToken
+    ): Promise<WorkspaceDiagnosticReport> {
+        await Server.getServer().waitUntilInitialized();
+        const items: WorkspaceDocumentDiagnosticReport[] = [];
+        const promises: Promise<Diagnostic[]>[] = [];
+        forEachDocument(async (di) => {
+            const dv = createDiagnosticVersion(di);
+            if (DiagnosticProvider.diagnosticsValid(di, dv) || token.isCancellationRequested) {
+                return;
+            }
+            const item = await DiagnosticProvider.getDiagnosticItem(di, promises);
+            items.push(item);
+            if (resultProgress) {
+                resultProgress.report({
+                    items: [item],
+                });
+            }
+            di.diagnostics.setDisplayVersion(dv);
+        });
+        await Promise.all(promises);
+        return { items };
+    }
+
+    private static async getDiagnosticItem(
+        di: DocumentInfo,
+        promises: Promise<Diagnostic[]>[]
+    ): Promise<WorkspaceDocumentDiagnosticReport> {
+        const configuration = getConfiguration();
+        const version = di.diagnostics.increaseVersion();
+        if (!configuration.diagnostics.enable || !configuration.diagnostics.workspace) {
+            return {
+                items: [],
+                kind: 'full',
+                uri: fsUriToLspUri(di.uri),
+                version,
+            };
+        } else {
+            const promise = di.diagnostics.getDiagnostics();
+            promises.push(promise);
+            const diagnostics = await promise;
+            return {
+                items: diagnostics,
+                kind: 'full',
+                uri: fsUriToLspUri(di.uri),
+                version,
+            };
+        }
+    }
+
+    private static diagnosticsValid(di: DocumentInfo, dv: DiagnosticVersion): boolean {
+        const latestDv = di.diagnostics.getDisplayVersion();
+        return !!(
+            latestDv &&
+            latestDv.configurationVersion >= dv.configurationVersion &&
+            latestDv.contentVersion >= dv.contentVersion
+        );
+    }
+
+    public static sendDiagnostics(di: DocumentInfo, diagnostics: Diagnostic[]): void {
+        if (!DiagnosticProvider.isPublishDiagnostics()) {
+            return;
+        }
+        const result: PublishDiagnosticsParams = {
+            uri: fsUriToLspUri(di.uri),
+            diagnostics,
+        };
+        if (getCapabilities().publishDiagnosticsVersion) {
+            result.version = di.diagnostics.increaseVersion();
+        }
+        Server.getServer().getConnection().sendDiagnostics(result);
+    }
+
+    public static removeDiagnosticsFrom(di: DocumentInfo): void {
+        DiagnosticProvider.sendDiagnostics(di, []);
+    }
+
     public constructor(di: DocumentInfo) {
         this.configuration = getConfiguration();
         this.di = di;
-        this.version = di.diagnostics.increaseVersion();
     }
 
-    public async validate(): Promise<void> {
+    public async validate(): Promise<Diagnostic[]> {
         const shaderStage = this.getShaderStage(this.di.uri);
         if (DiagnosticProvider.glslangName && shaderStage) {
             const sourceCode = await this.di.document.getText();
             this.sourceCodeRows = sourceCode.split(NEW_LINE);
             const glslangOutput = await this.runGlslang(shaderStage, sourceCode);
-            this.addDiagnosticsAndSend(glslangOutput);
+            this.addDiagnostics(glslangOutput);
         }
+        return this.diagnostics;
     }
 
     private getShaderStage(uri: DocumentUri): string | null {
@@ -122,12 +265,11 @@ export class DiagnosticProvider {
         }
     }
 
-    private addDiagnosticsAndSend(glslangOutput: string): void {
+    private addDiagnostics(glslangOutput: string): void {
         const glslangOutputRows = glslangOutput.split(NEW_LINE);
         for (const glslangOutputRow of glslangOutputRows) {
             this.addDiagnosticForRow(glslangOutputRow.trim());
         }
-        sendDiagnostics(this.di.uri, this.diagnostics, this.version);
     }
 
     private addDiagnosticForRow(glslangOutputRow: string): void {

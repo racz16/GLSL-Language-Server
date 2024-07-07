@@ -52,8 +52,8 @@ export abstract class Server {
     protected abstract createHost(): Host;
 
     protected addEventHandlers(): void {
-        this.connection.onInitialize((params) => {
-            return this.onInitialize(params);
+        this.connection.onInitialize(async (params) => {
+            return await this.onInitialize(params);
         });
         this.initialized = new Promise((resolve) => {
             this.connection.onInitialized(async () => {
@@ -78,10 +78,13 @@ export abstract class Server {
         });
     }
 
-    protected onInitialize(params: InitializeParams): InitializeResult {
+    protected async onInitialize(params: InitializeParams): Promise<InitializeResult> {
         initializeCapabilities(params.capabilities);
         this.setWorkspaceFolders(params);
         return {
+            serverInfo: {
+                name: 'GLSL Language Server',
+            },
             capabilities: {
                 textDocumentSync: TextDocumentSyncKind.Incremental,
                 completionProvider: CompletionProvider.getCompletionOptions(

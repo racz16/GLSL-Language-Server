@@ -8,6 +8,13 @@ export abstract class VersionedExecutor<T, V = number> {
         return v1 >= v2;
     }
 
+    public getFinishedVersion(): V | null {
+        if (!this.versionedData) {
+            return null;
+        }
+        return this.versionedData.version;
+    }
+
     public async getResult(version: V): Promise<T> {
         if (this.versionedData && this.isGreaterOrEqual(this.versionedData.version, version)) {
             return this.versionedData.data;

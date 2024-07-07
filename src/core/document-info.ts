@@ -1,5 +1,6 @@
-import { DocumentUri } from 'vscode-languageserver';
+import { Diagnostic, DocumentUri } from 'vscode-languageserver';
 
+import { DiagnosticProvider } from '../feature/diagnostic';
 import { Server } from '../server';
 import { getConfiguration, getDiagnosticConfigurationVersion } from './configuration';
 import { fsUriToLspUri } from './utility';
@@ -67,6 +68,7 @@ class VersionedDocumentContent extends VersionedExecutor<string> {
 
 export class DocumentDiagnostics {
     private version = 0;
+    private displayVersion?: DiagnosticVersion;
     private uri: DocumentUri;
     private versionedDiagnostics: VersionedDiagnostics;
 
@@ -79,17 +81,22 @@ export class DocumentDiagnostics {
         return ++this.version;
     }
 
-    public async validate(): Promise<void> {
+    public getDisplayVersion(): DiagnosticVersion | undefined {
+        return this.displayVersion;
+    }
+
+    public setDisplayVersion(dv: DiagnosticVersion): void {
+        this.displayVersion = dv;
+    }
+
+    public async getDiagnostics(): Promise<Diagnostic[]> {
         const di = getDocumentInfo(this.uri);
-        const dv: DiagnosticVersion = {
-            contentVersion: di.document.getVersion(),
-            configurationVersion: getDiagnosticConfigurationVersion(),
-        };
-        await this.versionedDiagnostics.getResult(dv);
+        const dv = createDiagnosticVersion(di);
+        return await this.versionedDiagnostics.getResult(dv);
     }
 }
 
-class VersionedDiagnostics extends VersionedExecutor<void, DiagnosticVersion> {
+class VersionedDiagnostics extends VersionedExecutor<Diagnostic[], DiagnosticVersion> {
     private uri: DocumentUri;
 
     public constructor(uri: DocumentUri) {
@@ -101,15 +108,22 @@ class VersionedDiagnostics extends VersionedExecutor<void, DiagnosticVersion> {
         return v1.contentVersion >= v2.contentVersion && v1.configurationVersion >= v2.configurationVersion;
     }
 
-    protected override async execute(): Promise<void> {
+    protected override async execute(): Promise<Diagnostic[]> {
         const di = getDocumentInfo(this.uri);
-        await Server.getServer().getHost().validate(di);
+        return await Server.getServer().getHost().validate(di);
     }
 }
 
-interface DiagnosticVersion {
+export interface DiagnosticVersion {
     contentVersion: number;
     configurationVersion: number;
+}
+
+export function createDiagnosticVersion(di: DocumentInfo): DiagnosticVersion {
+    return {
+        contentVersion: di.document.getVersion(),
+        configurationVersion: getDiagnosticConfigurationVersion(),
+    };
 }
 
 const documentInfos = new Map<DocumentUri, DocumentInfo>();
@@ -130,13 +144,17 @@ export function getDocumentInfo(uri: DocumentUri): DocumentInfo {
 export async function analyzeDocument(di: DocumentInfo): Promise<void> {
     const server = Server.getServer();
     await server.waitUntilInitialized();
+    if (!isUriValid(di.uri)) {
+        return;
+    }
     const configuration = getConfiguration();
     if (
         server.getHost().isDesktop() &&
         configuration.diagnostics.enable &&
         (configuration.diagnostics.workspace || di.document.isOpened())
     ) {
-        await di.diagnostics.validate();
+        const diagnostics = await di.diagnostics.getDiagnostics();
+        DiagnosticProvider.sendDiagnostics(di, diagnostics);
     }
 }
 
@@ -148,18 +166,6 @@ export async function analyzeAllDocuments(): Promise<void> {
 
 export function removeDocumentInfo(uri: DocumentUri): void {
     documentInfos.delete(uri);
-}
-
-export function removeInvalidDocumentInfos(): void {
-    const invalidUris: DocumentUri[] = [];
-    for (const [uri, di] of documentInfos.entries()) {
-        if (!di.document.isOpened() && !isUriValid(uri)) {
-            invalidUris.push(uri);
-        }
-    }
-    for (const uri of invalidUris) {
-        removeDocumentInfo(uri);
-    }
 }
 
 function isUriValid(uri: DocumentUri): boolean {
