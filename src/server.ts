@@ -3,6 +3,7 @@ import {
     DidChangeConfigurationNotification,
     InitializeParams,
     InitializeResult,
+    LSPAny,
     TextDocumentChangeEvent,
     TextDocumentSyncKind,
     TextDocuments,
@@ -14,6 +15,7 @@ import { Configuration, getConfiguration, setConfiguration } from './core/config
 import { GLSL_LANGUAGE_SERVER } from './core/constants';
 import { analyzeDocument, getDocumentInfo } from './core/document-info';
 import { Host } from './core/host';
+import { getTelemetryResult, sendTelemetryError } from './core/telemetry';
 import { lspUriToFsUri } from './core/utility';
 import { CompletionProvider } from './feature/completion';
 
@@ -27,20 +29,25 @@ export abstract class Server {
     protected host: Host;
 
     public static getServer(): Server {
-        return this.server;
+        return Server.server;
     }
 
     protected static setServer(newServer: Server): void {
-        this.server = newServer;
+        Server.server = newServer;
     }
 
     public constructor() {
-        this.connection = this.createConnection();
-        this.documents = new TextDocuments(TextDocument);
-        this.host = this.createHost();
-        this.addEventHandlers();
-        this.addFeatures();
-        this.listen();
+        try {
+            this.connection = this.createConnection();
+            this.documents = new TextDocuments(TextDocument);
+            this.host = this.createHost();
+            this.addEventHandlers();
+            this.addFeatures();
+            this.listen();
+        } catch (e) {
+            sendTelemetryError(e);
+            throw e;
+        }
     }
 
     protected abstract createConnection(): Connection;
@@ -53,28 +60,63 @@ export abstract class Server {
 
     protected addEventHandlers(): void {
         this.connection.onInitialize(async (params) => {
-            return await this.onInitialize(params);
+            try {
+                return await this.onInitialize(params);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         this.initialized = new Promise((resolve) => {
             this.connection.onInitialized(async () => {
-                await this.onInitialized();
-                resolve();
+                try {
+                    await this.onInitialized();
+                    resolve();
+                } catch (e) {
+                    sendTelemetryError(e);
+                    throw e;
+                }
             });
         });
         this.connection.onDidChangeConfiguration(async () => {
-            await this.onConfigurationChanged();
+            try {
+                await this.onConfigurationChanged();
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         this.documents.onDidOpen((event) => {
-            this.onDidOpen(event);
+            try {
+                this.onDidOpen(event);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         this.documents.onDidChangeContent(async (event) => {
-            await this.onDidChangeContent(event);
+            try {
+                await this.onDidChangeContent(event);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         this.documents.onDidClose((event) => {
-            this.onDidClose(event);
+            try {
+                this.onDidClose(event);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         this.connection.onShutdown(async () => {
-            await this.onShutdown();
+            try {
+                await this.onShutdown();
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
     }
 
@@ -149,7 +191,14 @@ export abstract class Server {
         di.document.setOpened(false);
     }
 
-    protected async onShutdown(): Promise<void> {}
+    public sendTelemetry(data: LSPAny): void {
+        this.connection.telemetry.logEvent(data);
+    }
+
+    protected async onShutdown(): Promise<void> {
+        const tr = getTelemetryResult();
+        this.sendTelemetry(tr);
+    }
 
     protected addFeatures(): void {
         this.connection.onCompletion(CompletionProvider.completionHandler);

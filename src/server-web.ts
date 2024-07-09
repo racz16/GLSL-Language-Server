@@ -23,12 +23,9 @@ export class ServerWeb extends Server {
 
     protected override createHost(): Host {
         return {
-            isDesktop: () => {
-                return false;
-            },
-            getDocumentContent: async () => {
-                return '';
-            },
+            isDesktop: () => false,
+            getDocumentContent: async () => '',
+            isGlslangExecutable: () => false,
             validate: async () => [],
             sendDiagnostics: () => {},
         };

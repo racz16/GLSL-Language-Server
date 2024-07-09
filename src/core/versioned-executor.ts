@@ -8,6 +8,10 @@ export abstract class VersionedExecutor<T, V = number> {
         return v1 >= v2;
     }
 
+    public getVersionedData(): VersionedData<T, V> | undefined {
+        return this.versionedData;
+    }
+
     public getFinishedVersion(): V | null {
         if (!this.versionedData) {
             return null;
