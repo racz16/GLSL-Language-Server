@@ -2,6 +2,7 @@ import { FSWatcher, watch } from 'chokidar';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
     Connection,
+    DocumentUri,
     InitializeParams,
     InitializeResult,
     ProposedFeatures,
@@ -26,6 +27,7 @@ import {
 } from './core/document-info';
 import { Host } from './core/host';
 import { getDocumentContent } from './core/node-utility';
+import { sendTelemetryError } from './core/telemetry';
 import { lspUriToFsUri } from './core/utility';
 import { DiagnosticProvider } from './feature/diagnostic';
 import { Server } from './server';
@@ -43,10 +45,9 @@ export class ServerDesktop extends Server {
 
     protected override createHost(): Host {
         return {
-            isDesktop: () => {
-                return true;
-            },
+            isDesktop: () => true,
             getDocumentContent: getDocumentContent,
+            isGlslangExecutable: DiagnosticProvider.isGlslangExecutable,
             validate: async (di) => {
                 const dp = new DiagnosticProvider(di);
                 return await dp.validate();
@@ -85,24 +86,51 @@ export class ServerDesktop extends Server {
 
     private addDocumentWatcherHandlers(documentWatcher: FSWatcher): void {
         documentWatcher.on('add', (uri) => {
-            const di = getDocumentInfo(uri);
-            this.analyzeDocumentIfNotOpened(di);
+            try {
+                this.onAddDocumentInDisk(uri);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         documentWatcher.on('change', (uri) => {
-            const di = getDocumentInfo(uri);
-            if (!di.document.isOpened()) {
-                di.document.increaseVersion();
+            try {
+                this.onChangeDocumentInDisk(uri);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
             }
-            this.analyzeDocumentIfNotOpened(di);
         });
         documentWatcher.on('unlink', (uri) => {
-            const di = getDocumentInfo(uri);
-            const diagnostics = getConfiguration().diagnostics;
-            if (diagnostics.enable && diagnostics.workspace) {
-                DiagnosticProvider.removeDiagnosticsFrom(di);
+            try {
+                this.onDeleteDocumentInDisk(uri);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
             }
-            removeDocumentInfo(uri);
         });
+    }
+
+    private onAddDocumentInDisk(uri: DocumentUri): void {
+        const di = getDocumentInfo(uri);
+        this.analyzeDocumentIfNotOpened(di);
+    }
+
+    private onChangeDocumentInDisk(uri: DocumentUri): void {
+        const di = getDocumentInfo(uri);
+        if (!di.document.isOpened()) {
+            di.document.increaseVersion();
+        }
+        this.analyzeDocumentIfNotOpened(di);
+    }
+
+    private onDeleteDocumentInDisk(uri: DocumentUri): void {
+        const di = getDocumentInfo(uri);
+        const diagnostics = getConfiguration().diagnostics;
+        if (diagnostics.enable && diagnostics.workspace) {
+            DiagnosticProvider.removeDiagnosticsFrom(di);
+        }
+        removeDocumentInfo(uri);
     }
 
     private getExtensionList(): string {
@@ -230,10 +258,20 @@ export class ServerDesktop extends Server {
     protected override addFeatures(): void {
         super.addFeatures();
         this.connection.languages.diagnostics.on(async (params) => {
-            return await DiagnosticProvider.validateDocument(params);
+            try {
+                return await DiagnosticProvider.validateDocument(params);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
         this.connection.languages.diagnostics.onWorkspace(async (params, token, workDoneProgress, resultProgress) => {
-            return await DiagnosticProvider.validateWorkspace(resultProgress, token);
+            try {
+                return await DiagnosticProvider.validateWorkspace(resultProgress, token);
+            } catch (e) {
+                sendTelemetryError(e);
+                throw e;
+            }
         });
     }
 }

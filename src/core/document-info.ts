@@ -38,6 +38,14 @@ export class DocumentContent {
         this.opened = opened;
     }
 
+    public getLength(): number | null {
+        const vd = this.versionedContent.getVersionedData();
+        if (!vd) {
+            return null;
+        }
+        return vd.data.length;
+    }
+
     public async getText(): Promise<string> {
         if (this.opened) {
             const textDocument = Server.getServer().getDocuments().get(fsUriToLspUri(this.uri));

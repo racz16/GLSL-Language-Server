@@ -29,6 +29,7 @@ import {
     getDocumentInfo,
 } from '../core/document-info';
 import { getPlatformName } from '../core/node-utility';
+import { addValidationMeasurement } from '../core/telemetry';
 import { fsUriToLspUri, lspUriToFsUri } from '../core/utility';
 import { Server } from '../server';
 
@@ -55,6 +56,10 @@ export class DiagnosticProvider {
                 DiagnosticProvider.setType();
             }
         }
+    }
+
+    public static isGlslangExecutable(): boolean {
+        return !!DiagnosticProvider.glslangName;
     }
 
     private static setType(): void {
@@ -206,10 +211,14 @@ export class DiagnosticProvider {
     public async validate(): Promise<Diagnostic[]> {
         const shaderStage = this.getShaderStage(this.di.uri);
         if (DiagnosticProvider.glslangName && shaderStage) {
+            const start = performance.now();
             const sourceCode = await this.di.document.getText();
             this.sourceCodeRows = sourceCode.split(NEW_LINE);
             const glslangOutput = await this.runGlslang(shaderStage, sourceCode);
             this.addDiagnostics(glslangOutput);
+            const end = performance.now();
+            const elapsed = end - start;
+            addValidationMeasurement(elapsed);
         }
         return this.diagnostics;
     }
