@@ -318,12 +318,20 @@ export class DiagnosticProvider {
     private getRange(line: number, snippet: string | undefined): Range {
         const row = this.replaceComments(this.sourceCodeRows[line]);
         if (snippet && !this.configuration.diagnostics.markTheWholeLine) {
-            const position = row.search(new RegExp(`\\b${snippet}\\b`));
+            const position = row.search(this.createSnippetRegExp(snippet));
             if (position !== -1) {
                 return Range.create(Position.create(line, position), Position.create(line, position + snippet.length));
             }
         }
         return this.getTrimmedRange(line, row);
+    }
+
+    private createSnippetRegExp(snippet: string): RegExp {
+        if (snippet.match(/^\w$/)) {
+            return new RegExp(`\\b${snippet}\\b`);
+        } else {
+            return new RegExp(snippet);
+        }
     }
 
     private replaceComments(line: string): string {
