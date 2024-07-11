@@ -4,6 +4,8 @@
         "esbenp.prettier-vscode",
         "github.vscode-github-actions",
         "editorconfig.editorconfig",
-        "codacy-app.codacy"
+        "amodio.tsl-problem-matcher",
+        "redcmd.tmlanguage-syntax-highlighter",
+        "mike-lischke.vscode-antlr4"
     ]
 }
