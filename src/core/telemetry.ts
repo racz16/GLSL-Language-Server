@@ -4,6 +4,7 @@ import { forEachDocument } from './document-info';
 
 let validationCount = 0;
 let validationTimeSum = 0;
+let intervalId: NodeJS.Timer | number | undefined;
 
 interface TelemetryResult {
     type: 'report';
@@ -41,12 +42,20 @@ interface StringTelemetryErrorResult {
 
 interface NumberTelemetryErrorResult {}
 
+export function initializeTelemetry(): void {
+    const oneMinuteMilliseconds = 60 * 1000;
+    intervalId = setInterval(() => {
+        const result = getTelemetryResult();
+        Server.getServer().sendTelemetry(result);
+    }, oneMinuteMilliseconds);
+}
+
 export function addValidationMeasurement(validationTime: number): void {
     validationCount++;
     validationTimeSum += validationTime;
 }
 
-export function getTelemetryResult(): TelemetryResult {
+function getTelemetryResult(): TelemetryResult {
     let documentCount = 0;
     let loadedDocumentCount = 0;
     let documentLengthSum = 0;
@@ -107,4 +116,8 @@ function createTelemetryErrorResult(message: string, name = '', stackTrace = '')
         },
         numberData: {},
     };
+}
+
+export function releaseTelemetry(): void {
+    clearInterval(intervalId);
 }
