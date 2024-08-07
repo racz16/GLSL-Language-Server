@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-/* eslint-disable @typescript-eslint/no-var-requires */
 //@ts-check
 'use strict';
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -13,7 +11,7 @@ module.exports = (_env, argv) => {
     /** @type WebpackConfig */
     const serverWebConfig = {
         context: path.join(__dirname),
-        mode: 'none',
+        mode: isProductionMode ? 'production' : 'development',
         target: 'webworker',
         entry: './src/server-web.ts',
         output: {
@@ -42,10 +40,6 @@ module.exports = (_env, argv) => {
         externals: {
             vscode: 'commonjs vscode',
         },
-        performance: {
-            hints: false,
-        },
-        devtool: isProductionMode ? false : 'source-map',
     };
 
     /**@type {import('webpack').Configuration}*/
