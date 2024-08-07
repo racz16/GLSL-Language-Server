@@ -67,13 +67,13 @@ export function getTelemetryResult(): TelemetryResult {
         },
         numberData: {
             documentCount,
-            averageDocumentLength: documentLengthSum / loadedDocumentCount,
+            averageDocumentLength: loadedDocumentCount > 0 ? documentLengthSum / loadedDocumentCount : 0,
             configurationDiagnosticsEnabled: +configuration.diagnostics.enable,
             configurationMarkTheWholeLine: +configuration.diagnostics.markTheWholeLine,
             configurationWorkspaceDiagnostics: +configuration.diagnostics.workspace,
             glslangExecutable: +Server.getServer().getHost().isGlslangExecutable(),
             validationCount,
-            averageValidationTime: validationTimeSum / validationCount,
+            averageValidationTime: validationCount > 0 ? validationTimeSum / validationCount : 0,
         },
     };
 }
