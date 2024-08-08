@@ -15,7 +15,7 @@ import { Configuration, getConfiguration, setConfiguration } from './core/config
 import { GLSL_LANGUAGE_SERVER } from './core/constants';
 import { analyzeDocument, getDocumentInfo } from './core/document-info';
 import { Host } from './core/host';
-import { initializeTelemetry, releaseTelemetry, sendTelemetryError } from './core/telemetry';
+import { initializeTelemetry, sendTelemetryError } from './core/telemetry';
 import { lspUriToFsUri } from './core/utility';
 import { CompletionProvider } from './feature/completion';
 
@@ -196,9 +196,7 @@ export abstract class Server {
         this.connection.telemetry.logEvent(data);
     }
 
-    protected async onShutdown(): Promise<void> {
-        releaseTelemetry();
-    }
+    protected async onShutdown(): Promise<void> {}
 
     protected addFeatures(): void {
         this.connection.onCompletion(CompletionProvider.completionHandler);

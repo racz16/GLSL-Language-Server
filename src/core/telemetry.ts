@@ -4,7 +4,6 @@ import { forEachDocument } from './document-info';
 
 let validationCount = 0;
 let validationTimeSum = 0;
-let intervalId: NodeJS.Timer | number | undefined;
 
 interface TelemetryResult {
     type: 'report';
@@ -44,7 +43,7 @@ interface NumberTelemetryErrorResult {}
 
 export function initializeTelemetry(): void {
     const oneMinuteMilliseconds = 60 * 1000;
-    intervalId = setInterval(() => {
+    setInterval(() => {
         const result = getTelemetryResult();
         Server.getServer().sendTelemetry(result);
     }, oneMinuteMilliseconds);
@@ -116,8 +115,4 @@ function createTelemetryErrorResult(message: string, name = '', stackTrace = '')
         },
         numberData: {},
     };
-}
-
-export function releaseTelemetry(): void {
-    clearInterval(intervalId);
 }
