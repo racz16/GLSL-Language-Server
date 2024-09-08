@@ -1,8 +1,21 @@
 {
     "name": "glsl-language-server",
-    "displayName": "GLSL Language Server",
     "version": "0.0.1",
+    "displayName": "GLSL Language Server",
     "description": "A Node-based language server for the GLSL shader language.",
+    "engines": {
+        "node": "*"
+    },
+    "license": "MIT",
+    "keywords": [
+        "glsl",
+        "shader",
+        "webgl",
+        "opengl",
+        "vulkan"
+    ],
+    "main": "./out/server-desktop",
+    "browser": "./out/server-web",
     "author": {
         "name": "Rácz Zalán",
         "email": "zalan.racz.dev@gmail.com",
@@ -17,32 +30,19 @@
         "url": "https://github.com/racz16/GLSL-Language-Server/issues",
         "email": "zalan.racz.dev@gmail.com"
     },
-    "license": "MIT",
-    "keywords": [
-        "glsl",
-        "shader",
-        "webgl",
-        "opengl",
-        "vulkan"
-    ],
     "os": [
         "win32",
         "linux",
         "darwin"
     ],
-    "main": "./out/server-desktop",
-    "browser": "./out/server-web",
-    "engines": {
-        "node": "*"
-    },
     "scripts": {
         "build-production": "webpack --mode production",
         "build": "webpack",
         "watch": "webpack --watch",
-        "test": "mocha ./src/**/*.spec.ts --require ts-node/register",
         "prettier-lint": "prettier --check .",
         "prettier-format": "prettier --write .",
-        "eslint": "eslint ./src",
+        "lint": "eslint ./src",
+        "test": "mocha ./src/**/*.spec.ts --require ts-node/register",
         "prepare": "husky install"
     },
     "dependencies": {
