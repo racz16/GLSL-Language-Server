@@ -1,6 +1,7 @@
 import { ChildProcess, exec } from 'child_process';
 import { access, chmod, constants } from 'fs/promises';
 import { arch, platform } from 'os';
+import { performance } from 'perf_hooks';
 import { Readable } from 'stream';
 import {
     CancellationToken,
