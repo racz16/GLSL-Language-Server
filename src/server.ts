@@ -17,7 +17,6 @@ import { analyzeDocument, getDocumentInfo } from './core/document-info';
 import { Host } from './core/host';
 import { initializeTelemetry, sendTelemetryError } from './core/telemetry';
 import { lspUriToFsUri } from './core/utility';
-import { CompletionProvider } from './feature/completion';
 
 export abstract class Server {
     private static server: Server;
@@ -129,9 +128,6 @@ export abstract class Server {
             },
             capabilities: {
                 textDocumentSync: TextDocumentSyncKind.Incremental,
-                completionProvider: CompletionProvider.getCompletionOptions(
-                    params.capabilities.textDocument?.completion
-                ),
             },
         };
     }
@@ -198,9 +194,7 @@ export abstract class Server {
 
     protected async onShutdown(): Promise<void> {}
 
-    protected addFeatures(): void {
-        this.connection.onCompletion(CompletionProvider.completionHandler);
-    }
+    protected addFeatures(): void {}
 
     private listen(): void {
         this.documents.listen(this.connection);
