@@ -53,7 +53,6 @@ export default tseslint.config(
                     format: ['camelCase'],
                 },
             ],
-            '@typescript-eslint/semi': 'warn',
             eqeqeq: ['error', 'smart'],
             curly: 'warn',
         },
