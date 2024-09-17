@@ -91,12 +91,12 @@ export class DiagnosticProvider {
         try {
             await access(file, constants.X_OK);
             return true;
-        } catch (e1) {
+        } catch {
             // file is not executable
             try {
                 await chmod(file, 0o755);
                 return true;
-            } catch (e2) {
+            } catch {
                 // can't make the file executable
                 return false;
             }
