@@ -53,7 +53,11 @@ export class DiagnosticProvider {
             const executablePath = glslangName;
             const executable = await DiagnosticProvider.makeFileExecutableIfNeeded(executablePath, platformName);
             if (executable) {
-                DiagnosticProvider.glslangName = glslangName;
+                if (platformName === 'win32') {
+                    DiagnosticProvider.glslangName = glslangName;
+                } else {
+                    DiagnosticProvider.glslangName = `./${glslangName}`;
+                }
                 DiagnosticProvider.setType();
             }
         }
