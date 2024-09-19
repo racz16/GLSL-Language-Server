@@ -253,8 +253,8 @@ export class DiagnosticProvider {
     private async runGlslang(shaderStage: string, sourceCode: string): Promise<string> {
         return new Promise<string>((resolve) => {
             const command = this.createGlslangCommand(shaderStage);
-            const process = exec(command, (_, glslangOutput) => {
-                resolve(glslangOutput);
+            const process = exec(command, (_, stdout, stderr) => {
+                resolve(stderr ? stderr : stdout);
             });
             this.provideInput(process, sourceCode);
         });
