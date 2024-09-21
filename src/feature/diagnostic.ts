@@ -220,7 +220,19 @@ export class DiagnosticProvider {
             const sourceCode = await this.di.document.getText();
             this.sourceCodeRows = sourceCode.split(NEW_LINE);
             const glslangOutput = await this.runGlslang(shaderStage, sourceCode);
-            this.addDiagnostics(glslangOutput);
+            if (platform() === 'darwin') {
+                const diagnostic = Diagnostic.create(
+                    Range.create(Position.create(0, 0), Position.create(1, 0)),
+                    glslangOutput,
+                    DiagnosticSeverity.Error,
+                    undefined,
+                    GLSLANG
+                );
+                this.diagnostics.push(diagnostic);
+                this.diagnostics.push(diagnostic);
+            } else {
+                this.addDiagnostics(glslangOutput);
+            }
             //const end = performance.now();
             //const elapsed = end - start;
             //addValidationMeasurement(elapsed);
@@ -253,8 +265,8 @@ export class DiagnosticProvider {
     private async runGlslang(shaderStage: string, sourceCode: string): Promise<string> {
         return new Promise<string>((resolve) => {
             const command = this.createGlslangCommand(shaderStage);
-            const process = exec(command, (_, stdout, stderr) => {
-                resolve(stderr ? stderr : stdout);
+            const process = exec(command, (_, stdout) => {
+                resolve(stdout);
             });
             this.provideInput(process, sourceCode);
         });
@@ -282,18 +294,7 @@ export class DiagnosticProvider {
     private addDiagnostics(glslangOutput: string): void {
         const glslangOutputRows = glslangOutput.split(NEW_LINE);
         for (const glslangOutputRow of glslangOutputRows) {
-            if (platform() === 'darwin') {
-                const diagnostic = Diagnostic.create(
-                    Range.create(Position.create(0, 0), Position.create(1, 0)),
-                    'asd',
-                    DiagnosticSeverity.Error,
-                    undefined,
-                    GLSLANG
-                );
-                this.diagnostics.push(diagnostic);
-            } else {
-                this.addDiagnosticForRow(glslangOutputRow.trim());
-            }
+            this.addDiagnosticForRow(glslangOutputRow.trim());
         }
     }
 
