@@ -282,8 +282,18 @@ export class DiagnosticProvider {
     private addDiagnostics(glslangOutput: string): void {
         const glslangOutputRows = glslangOutput.split(NEW_LINE);
         for (const glslangOutputRow of glslangOutputRows) {
-            // this.addDiagnosticForRow(glslangOutputRow.trim());
-            this.addDiagnostic('ERROR', 0, '', undefined, glslangOutputRow);
+            if (platform() === 'darwin') {
+                const diagnostic = Diagnostic.create(
+                    Range.create(Position.create(0, 0), Position.create(1, 0)),
+                    'asd',
+                    DiagnosticSeverity.Error,
+                    undefined,
+                    GLSLANG
+                );
+                this.diagnostics.push(diagnostic);
+            } else {
+                this.addDiagnosticForRow(glslangOutputRow.trim());
+            }
         }
     }
 
