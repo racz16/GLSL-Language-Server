@@ -2,7 +2,6 @@ import { ChildProcess, exec } from 'child_process';
 import { access, chmod, constants } from 'fs/promises';
 import { arch, platform } from 'os';
 //import { performance } from 'perf_hooks';
-import { Readable } from 'stream';
 import {
     CancellationToken,
     Diagnostic,
@@ -220,19 +219,19 @@ export class DiagnosticProvider {
             const sourceCode = await this.di.document.getText();
             this.sourceCodeRows = sourceCode.split(NEW_LINE);
             const glslangOutput = await this.runGlslang(shaderStage, sourceCode);
-            if (platform() === 'darwin') {
-                const diagnostic = Diagnostic.create(
-                    Range.create(Position.create(0, 0), Position.create(1, 0)),
-                    glslangOutput,
-                    DiagnosticSeverity.Error,
-                    undefined,
-                    GLSLANG
-                );
-                this.diagnostics.push(diagnostic);
-                this.diagnostics.push(diagnostic);
-            } else {
-                this.addDiagnostics(glslangOutput);
-            }
+            // if (platform() === 'darwin') {
+            //     const diagnostic = Diagnostic.create(
+            //         Range.create(Position.create(0, 0), Position.create(1, 0)),
+            //         glslangOutput,
+            //         DiagnosticSeverity.Error,
+            //         undefined,
+            //         GLSLANG
+            //     );
+            //     this.diagnostics.push(diagnostic);
+            //     this.diagnostics.push(diagnostic);
+            // } else {
+            this.addDiagnostics(glslangOutput);
+            // }
             //const end = performance.now();
             //const elapsed = end - start;
             //addValidationMeasurement(elapsed);
@@ -283,12 +282,14 @@ export class DiagnosticProvider {
     }
 
     private provideInput(process: ChildProcess, sourceCode: string): void {
-        const stdinStream = new Readable();
-        stdinStream.push(sourceCode);
-        stdinStream.push(null);
-        if (process.stdin) {
-            stdinStream.pipe(process.stdin);
-        }
+        process.stdin?.write(sourceCode);
+        process.stdin?.end();
+        // const stdinStream = new Readable();
+        // stdinStream.push(sourceCode);
+        // stdinStream.push(null);
+        // if (process.stdin) {
+        //     stdinStream.pipe(process.stdin);
+        // }
     }
 
     private addDiagnostics(glslangOutput: string): void {
