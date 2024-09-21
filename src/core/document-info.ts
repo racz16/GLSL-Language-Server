@@ -1,4 +1,3 @@
-import { platform } from 'os';
 import { Diagnostic, DiagnosticSeverity, DocumentUri, Position, Range } from 'vscode-languageserver';
 
 import { Server } from '../server';
@@ -154,19 +153,17 @@ export async function analyzeDocument(di: DocumentInfo): Promise<void> {
     const server = Server.getServer();
     await server.waitUntilInitialized();
 
-    if (platform() === 'darwin') {
-        const diagnostic = Diagnostic.create(
-            Range.create(Position.create(0, 0), Position.create(1, 0)),
-            'asd',
-            DiagnosticSeverity.Error,
-            undefined,
-            GLSLANG
-        );
-        const diagnostics: Diagnostic[] = [];
-        diagnostics.push(diagnostic);
-        diagnostics.push(diagnostic);
-        server.getHost().sendDiagnostics(di, diagnostics);
-    }
+    const diagnostic = Diagnostic.create(
+        Range.create(Position.create(0, 0), Position.create(1, 0)),
+        'asd',
+        DiagnosticSeverity.Error,
+        undefined,
+        GLSLANG
+    );
+    const diagnostics: Diagnostic[] = [];
+    diagnostics.push(diagnostic);
+    diagnostics.push(diagnostic);
+    server.getHost().sendDiagnostics(di, diagnostics);
 
     if (!isUriValid(di.uri)) {
         return;
