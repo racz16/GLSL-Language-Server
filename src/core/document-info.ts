@@ -1,8 +1,7 @@
-import { Diagnostic, DiagnosticSeverity, DocumentUri, Position, Range } from 'vscode-languageserver';
+import { Diagnostic, DocumentUri } from 'vscode-languageserver';
 
 import { Server } from '../server';
 import { getConfiguration, getDiagnosticConfigurationVersion } from './configuration';
-import { GLSLANG } from './constants';
 import { fsUriToLspUri } from './utility';
 import { VersionedExecutor } from './versioned-executor';
 
@@ -152,19 +151,6 @@ export function getDocumentInfo(uri: DocumentUri): DocumentInfo {
 export async function analyzeDocument(di: DocumentInfo): Promise<void> {
     const server = Server.getServer();
     await server.waitUntilInitialized();
-
-    const diagnostic = Diagnostic.create(
-        Range.create(Position.create(0, 0), Position.create(1, 0)),
-        'asd',
-        DiagnosticSeverity.Error,
-        undefined,
-        GLSLANG
-    );
-    const diagnostics: Diagnostic[] = [];
-    diagnostics.push(diagnostic);
-    diagnostics.push(diagnostic);
-    server.getHost().sendDiagnostics(di, diagnostics);
-
     if (!isUriValid(di.uri)) {
         return;
     }
