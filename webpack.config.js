@@ -1,11 +1,11 @@
-/* eslint-disable no-undef */
-/* eslint-disable @typescript-eslint/no-var-requires */
 //@ts-check
 'use strict';
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
 const path = require('path');
 const child_process = require('child_process');
+const { IgnorePlugin } = require('webpack');
+const process = require('process');
 
 module.exports = (_env, argv) => {
     const isProductionMode = argv.mode === 'production';
@@ -13,7 +13,7 @@ module.exports = (_env, argv) => {
     /** @type WebpackConfig */
     const serverWebConfig = {
         context: path.join(__dirname),
-        mode: 'none',
+        mode: isProductionMode ? 'production' : 'development',
         target: 'webworker',
         entry: './src/server-web.ts',
         output: {
@@ -42,10 +42,6 @@ module.exports = (_env, argv) => {
         externals: {
             vscode: 'commonjs vscode',
         },
-        performance: {
-            hints: false,
-        },
-        devtool: isProductionMode ? false : 'source-map',
     };
 
     /**@type {import('webpack').Configuration}*/
@@ -78,29 +74,30 @@ module.exports = (_env, argv) => {
         },
         externals: {
             vscode: 'commonjs vscode',
-            fsevents: "require('fsevents')",
         },
         devtool: isProductionMode ? false : 'source-map',
+        plugins: [],
     };
 
     if (isProductionMode) {
-        serverDesktopConfig.plugins = [
-            {
-                /**@type {import('webpack').WebpackPluginFunction}*/
-                apply: (compiler) => {
-                    compiler.hooks.afterEmit.tap('AfterEmitPlugin', () => {
-                        child_process.exec(
-                            'npx pkg -t node14-win-x64,node14-linux-x64,node14-macos-x64 --out-path bin out/server-desktop.js',
-                            { cwd: __dirname },
-                            (_err, stdout, stderr) => {
-                                if (stdout) process.stdout.write(stdout);
-                                if (stderr) process.stderr.write(stderr);
-                            }
-                        );
-                    });
-                },
+        serverDesktopConfig.plugins?.push({
+            /**@type {import('webpack').WebpackPluginFunction}*/
+            apply: (compiler) => {
+                compiler.hooks.afterEmit.tap('AfterEmitPlugin', () => {
+                    child_process.exec(
+                        'npx pkg -t node14-win-x64,node14-linux-x64,node14-macos-x64 --out-path bin out/server-desktop.js',
+                        { cwd: __dirname },
+                        (_err, stdout, stderr) => {
+                            if (stdout) process.stdout.write(stdout);
+                            if (stderr) process.stderr.write(stderr);
+                        }
+                    );
+                });
             },
-        ];
+        });
+    }
+    if (process.platform === 'darwin') {
+        serverDesktopConfig.plugins?.push(new IgnorePlugin({ resourceRegExp: /^fsevents$/ }));
     }
     return [serverDesktopConfig, serverWebConfig];
 };

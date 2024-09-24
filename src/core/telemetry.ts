@@ -39,14 +39,23 @@ interface StringTelemetryErrorResult {
     stackTrace: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface NumberTelemetryErrorResult {}
+
+export function initializeTelemetry(): void {
+    const oneMinuteMilliseconds = 60 * 1000;
+    setInterval(() => {
+        const result = getTelemetryResult();
+        Server.getServer().sendTelemetry(result);
+    }, oneMinuteMilliseconds);
+}
 
 export function addValidationMeasurement(validationTime: number): void {
     validationCount++;
     validationTimeSum += validationTime;
 }
 
-export function getTelemetryResult(): TelemetryResult {
+function getTelemetryResult(): TelemetryResult {
     let documentCount = 0;
     let loadedDocumentCount = 0;
     let documentLengthSum = 0;
@@ -67,13 +76,13 @@ export function getTelemetryResult(): TelemetryResult {
         },
         numberData: {
             documentCount,
-            averageDocumentLength: documentLengthSum / loadedDocumentCount,
+            averageDocumentLength: loadedDocumentCount > 0 ? documentLengthSum / loadedDocumentCount : 0,
             configurationDiagnosticsEnabled: +configuration.diagnostics.enable,
             configurationMarkTheWholeLine: +configuration.diagnostics.markTheWholeLine,
             configurationWorkspaceDiagnostics: +configuration.diagnostics.workspace,
             glslangExecutable: +Server.getServer().getHost().isGlslangExecutable(),
             validationCount,
-            averageValidationTime: validationTimeSum / validationCount,
+            averageValidationTime: validationCount > 0 ? validationTimeSum / validationCount : 0,
         },
     };
 }

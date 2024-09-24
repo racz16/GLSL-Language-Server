@@ -1,7 +1,7 @@
 import { ChildProcess, exec } from 'child_process';
 import { access, chmod, constants } from 'fs/promises';
 import { arch, platform } from 'os';
-import { Readable } from 'stream';
+import { performance } from 'perf_hooks';
 import {
     CancellationToken,
     Diagnostic,
@@ -52,7 +52,11 @@ export class DiagnosticProvider {
             const executablePath = glslangName;
             const executable = await DiagnosticProvider.makeFileExecutableIfNeeded(executablePath, platformName);
             if (executable) {
-                DiagnosticProvider.glslangName = glslangName;
+                if (platformName === 'win32') {
+                    DiagnosticProvider.glslangName = glslangName;
+                } else {
+                    DiagnosticProvider.glslangName = `./${glslangName}`;
+                }
                 DiagnosticProvider.setType();
             }
         }
@@ -90,12 +94,12 @@ export class DiagnosticProvider {
         try {
             await access(file, constants.X_OK);
             return true;
-        } catch (e1) {
+        } catch {
             // file is not executable
             try {
                 await chmod(file, 0o755);
                 return true;
-            } catch (e2) {
+            } catch {
                 // can't make the file executable
                 return false;
             }
@@ -248,8 +252,8 @@ export class DiagnosticProvider {
     private async runGlslang(shaderStage: string, sourceCode: string): Promise<string> {
         return new Promise<string>((resolve) => {
             const command = this.createGlslangCommand(shaderStage);
-            const process = exec(command, (_, glslangOutput) => {
-                resolve(glslangOutput);
+            const process = exec(command, (_, stdout) => {
+                resolve(stdout);
             });
             this.provideInput(process, sourceCode);
         });
@@ -266,11 +270,9 @@ export class DiagnosticProvider {
     }
 
     private provideInput(process: ChildProcess, sourceCode: string): void {
-        const stdinStream = new Readable();
-        stdinStream.push(sourceCode);
-        stdinStream.push(null);
         if (process.stdin) {
-            stdinStream.pipe(process.stdin);
+            process.stdin.write(sourceCode);
+            process.stdin.end();
         }
     }
 
@@ -290,8 +292,14 @@ export class DiagnosticProvider {
             const line = this.getLine(regexResult.groups['line']);
             const snippet: string | undefined = regexResult.groups['snippet'];
             const description = regexResult.groups['description'];
-            if (!DiagnosticProvider.ignoredErrorMessages.some((em) => description.includes(em))) {
-                this.addDiagnostic(severity, line, snippet, description);
+            const row = this.sourceCodeRows[line];
+            if (
+                row != null &&
+                severity &&
+                description &&
+                !DiagnosticProvider.ignoredErrorMessages.some((em) => description.includes(em))
+            ) {
+                this.addDiagnostic(severity, line, row, snippet, description);
             }
         }
     }
@@ -304,9 +312,15 @@ export class DiagnosticProvider {
         return 0 <= line && line < this.sourceCodeRows.length ? line : 0;
     }
 
-    private addDiagnostic(severity: string, line: number, snippet: string | undefined, description: string): void {
+    private addDiagnostic(
+        severity: string,
+        line: number,
+        row: string,
+        snippet: string | undefined,
+        description: string
+    ): void {
         const diagnostic = Diagnostic.create(
-            this.getRange(line, snippet),
+            this.getRange(line, row, snippet),
             this.getMessage(description, snippet),
             this.getSeverity(severity),
             undefined, // glslang doesn't provide error codes
@@ -315,34 +329,59 @@ export class DiagnosticProvider {
         this.diagnostics.push(diagnostic);
     }
 
-    private getRange(line: number, snippet: string | undefined): Range {
-        const row = this.replaceComments(this.sourceCodeRows[line]);
-        if (snippet && !this.configuration.diagnostics.markTheWholeLine) {
-            const position = row.search(this.createSnippetRegExp(snippet));
-            if (position !== -1) {
-                return Range.create(Position.create(line, position), Position.create(line, position + snippet.length));
+    private getRange(line: number, row: string, snippet?: string): Range {
+        if (this.configuration.diagnostics.markTheWholeLine) {
+            return Range.create(Position.create(line, 0), Position.create(line, row.length));
+        }
+        const processedRow = this.processRow(row, snippet);
+        if (snippet) {
+            const result = this.getRangeInTheRow(processedRow, line, snippet);
+            if (result) {
+                return result;
             }
         }
-        return this.getTrimmedRange(line, row);
+        return this.getTrimmedRange(line, processedRow);
+    }
+
+    private getRangeInTheRow(row: string, line: number, snippet: string): Range | null {
+        const regExp = this.createSnippetRegExp(snippet);
+        let regExpResult: RegExpExecArray | null;
+        let first = true;
+        let result: Range | null = null;
+        while ((regExpResult = regExp.exec(row))) {
+            if (!first) {
+                return null;
+            }
+            result = Range.create(
+                Position.create(line, regExpResult.index),
+                Position.create(line, regExpResult.index + regExpResult[0].length)
+            );
+            first = false;
+        }
+        return result;
     }
 
     private createSnippetRegExp(snippet: string): RegExp {
-        if (snippet.match(/^\w$/)) {
-            return new RegExp(`\\b${snippet}\\b`);
+        if (snippet.match(/^\w+$/g)) {
+            return new RegExp(`\\b${snippet}\\b`, 'g');
         } else {
-            return new RegExp(snippet);
+            return new RegExp(snippet, 'g');
         }
     }
 
-    private replaceComments(line: string): string {
+    private processRow(line: string, snippet?: string): string {
         const regex = /\/\*.*?\*\/|^(?:[^/]|\/[^*])*\*\/|\/\*(?:[^*]|\*[^/])*$|\/\/.*/g;
         let regexResult: RegExpExecArray | null;
-        while ((regexResult = regex.exec(line))) {
-            const position = regexResult.index;
-            const matchLength = regexResult[0].length;
-            line = line.substring(0, position) + SPACE.repeat(matchLength) + line.substring(position + matchLength);
+        let result = line;
+        if (snippet !== 'line continuation') {
+            while ((regexResult = regex.exec(line))) {
+                const position = regexResult.index;
+                const matchLength = regexResult[0].length;
+                result =
+                    line.substring(0, position) + SPACE.repeat(matchLength) + line.substring(position + matchLength);
+            }
         }
-        return line;
+        return result;
     }
 
     private getTrimmedRange(line: number, row: string): Range {

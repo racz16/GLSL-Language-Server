@@ -15,9 +15,8 @@ import { Configuration, getConfiguration, setConfiguration } from './core/config
 import { GLSL_LANGUAGE_SERVER } from './core/constants';
 import { analyzeDocument, getDocumentInfo } from './core/document-info';
 import { Host } from './core/host';
-import { getTelemetryResult, sendTelemetryError } from './core/telemetry';
+import { initializeTelemetry, sendTelemetryError } from './core/telemetry';
 import { lspUriToFsUri } from './core/utility';
-import { CompletionProvider } from './feature/completion';
 
 export abstract class Server {
     private static server: Server;
@@ -129,9 +128,6 @@ export abstract class Server {
             },
             capabilities: {
                 textDocumentSync: TextDocumentSyncKind.Incremental,
-                completionProvider: CompletionProvider.getCompletionOptions(
-                    params.capabilities.textDocument?.completion
-                ),
             },
         };
     }
@@ -157,6 +153,7 @@ export abstract class Server {
                 await this.connection.workspace.getConfiguration(GLSL_LANGUAGE_SERVER);
             setConfiguration(newConfiguration);
         }
+        initializeTelemetry();
     }
 
     public async waitUntilInitialized(): Promise<void> {
@@ -195,14 +192,9 @@ export abstract class Server {
         this.connection.telemetry.logEvent(data);
     }
 
-    protected async onShutdown(): Promise<void> {
-        const tr = getTelemetryResult();
-        this.sendTelemetry(tr);
-    }
+    protected async onShutdown(): Promise<void> {}
 
-    protected addFeatures(): void {
-        this.connection.onCompletion(CompletionProvider.completionHandler);
-    }
+    protected addFeatures(): void {}
 
     private listen(): void {
         this.documents.listen(this.connection);
