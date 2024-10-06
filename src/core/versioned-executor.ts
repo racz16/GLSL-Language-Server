@@ -29,16 +29,16 @@ export abstract class VersionedExecutor<T, V = number> {
         }
     }
 
-    private startExecution(version: V): Promise<T> {
+    private async startExecution(version: V): Promise<T> {
         const vp: VersionedPromise<T, V> = {
             version,
             promise: this.execute(),
         };
         this.versionedPromise = vp;
-        vp.promise.then((data) => {
+        return vp.promise.then((data) => {
             this.updateVersionedData(vp, data);
+            return this.versionedData?.data ?? data;
         });
-        return vp.promise;
     }
 
     private updateVersionedData(vp: VersionedPromise<T, V>, data: T): void {
